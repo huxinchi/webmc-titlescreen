@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Direct Connection</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none; font-smooth: never;
+    position: relative;
+  }
+
+  .direct-root {
+    position: fixed; top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1; overflow: hidden;
+  }
+  .direct-title {
+    position: absolute; top: 17px; left: 0; right: 0;
+    text-align: center;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px); line-height: 1;
+    color: #ffffff; text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+  }
+  .direct-label {
+    position: absolute; left: calc(50% - 100px); top: 66px;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px); line-height: 1;
+    color: #A0A0A0; text-shadow: 1px 1px 0 #1a1a1a;
+    user-select: none; white-space: nowrap;
+  }
+  .direct-input-wrap {
+    position: absolute; left: calc(50% - 100px); top: 80px;
+    width: 200px; height: 20px;
+  }
+  .direct-input-wrap .mc-input {
+    width: 100%; height: 100%; box-sizing: border-box;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+  }
+  .direct-footer {
+    position: absolute; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 4px;
+  }
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="direct-root">
+
+  <div class="direct-title">Direct Connection</div>
+
+  <div class="direct-label">Server Address</div>
+  <div class="direct-input-wrap">
+    <input class="mc-input" id="direct-addr" type="text" autocomplete="off">
+  </div>
+
+  <div class="direct-footer" id="direct-footer">
+    <button class="mcbtn mcbtn-half" id="btn-join">Join</button>
+    <a class="mcbtn mcbtn-half btn-back" id="btn-cancel" href="multiplayer.html">Cancel</a>
+  </div>
+
+</div>
+
+<script src="assets/servers/presets.js"></script>
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var DIRECT_JOIN_KEY = 'mc_direct_join';
+
+  var addrInput = document.getElementById('direct-addr');
+  var btnJoin   = document.getElementById('btn-join');
+  var footerEl  = document.getElementById('direct-footer');
+
+  function valid() {
+    return addrInput.value.trim().length > 0;
+  }
+  function refreshJoinState() {
+    btnJoin.disabled = !valid();
+  }
+  addrInput.addEventListener('input', refreshJoinState);
+  refreshJoinState();
+
+  /* ==========================================================
+     Join —— 手动写 sessionStorage + mcBack.back()
+     不用 .btn-back（避免 listener 顺序问题）
+     ========================================================== */
+  btnJoin.addEventListener('click', function() {
+    if (!valid()) return;
+    var addr = addrInput.value.trim();
+    var match = window.mcMatchPreset ? window.mcMatchPreset(addr) : null;
+
+try {
+  localStorage.setItem(DIRECT_JOIN_KEY, JSON.stringify({
+    ok:     !!match,
+    addr:   addr,
+    preset: match ? match.key : null
+  }));
+} catch (err) {
+  console.warn('[direct] localStorage 写入失败', err);
+}
+
+    /* 手动弹栈；栈空 fallback 到 multiplayer.html */
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('multiplayer.html');
+    } else {
+      location.href = 'multiplayer.html';
+    }
+  });
+
+  function layoutFooter() {
+    var rootEl = document.querySelector('.direct-root');
+    var h = rootEl.clientHeight || window.innerHeight;
+    footerEl.style.top = (Math.floor(h / 4) + 120 + 12) + 'px';
+  }
+  layoutFooter();
+  window.addEventListener('resize', layoutFooter);
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (window.mcBack && typeof window.mcBack.back === 'function') {
+        window.mcBack.back('multiplayer.html');
+      } else {
+        location.href = 'multiplayer.html';
+      }
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (valid()) btnJoin.click();
+    }
+  }, true);
+
+  addrInput.focus();
+
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Minecraft Realms</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/realms/realms.png">
+<link rel="preload" as="image" href="assets/realms/popup.png">
+<link rel="preload" as="image" href="assets/realms/darken.png">
+<link rel="preload" as="image" href="assets/realm_status/open.png">
+<link rel="preload" as="image" href="assets/realm_status/closed.png">
+<link rel="preload" as="image" href="assets/realm_status/expired.png">
+<link rel="preload" as="image" href="assets/realm_status/expires_soon.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  /* ==========================================================
+     根容器 —— 缩放到视口
+     ========================================================== */
+  .realms-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .realms-root > * { pointer-events: auto; }
+
+  /* ==========================================================
+     Logo —— realms.png 211×48，缩放 0.5 → 105.5×24
+     位置 (width/2 - 52.75, 2)
+     ========================================================== */
+  .realms-logo {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 2px;
+    width: 105.5px;
+    height: 24px;
+    background-image: url('assets/realms/realms.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+
+  /* ==========================================================
+     顶部图标
+     - 邀请：(width/2 + 50, 2) 15×25
+     - 新闻：(width - 62, 6) 20×20
+     - 帮助：(width - 37, 6) 20×20
+     ========================================================== */
+  .realms-icon {
+    position: absolute;
+    cursor: pointer;
+    background-position: 0 0;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    user-select: none;
+  }
+
+  /* invite_icon.png 31×25（两帧横排 15×25） */
+ .realms-icon-invite {
+  width: 15px; height: 25px;
+  top: 2px;
+  background-image: url('assets/realms/invite_icon.png');
+  background-size: 31px 25px;
+  background-position: 0 0;
+  text-decoration: none;   /* ← 新增 */
+}
+  .realms-icon-invite:hover {
+    background-position: -16px 0;
+  }
+
+  /* news_icon.png 80×40（4 帧，每帧 20×20）
+     - 帧 0：普通
+     - 帧 1：hover
+     - 帧 2：未读
+     - 帧 3：hover 未读
+     ========================================================== */
+/* news_icon.png 80×40 —— 2 帧 40×40（含按钮背景） */
+/* news_icon.png 80×40 → 2 帧 40×40，缩放到 20×20 显示 */
+.realms-icon-news {
+  width: 20px;
+  height: 20px;
+  top: 6px;
+  right: 62px;
+  background-image: url('assets/realms/news_icon.png');
+  background-size: 40px 20px;   /* 原 80×40 缩一半 */
+  background-position: 0 0;
+}
+.realms-icon-news:hover {
+  background-position: -20px 0;
+}
+
+.realms-icon-help {
+  width: 20px;
+  height: 20px;
+  top: 6px;
+  right: 37px;
+  background-image: url('assets/realms/questionmark.png');
+  background-size: 40px 20px;
+  background-position: 0 0;
+}
+.realms-icon-help:hover {
+  background-position: -20px 0;
+}
+
+  /* 邀请数字徽章 —— invitation_icons.png 48×16，第 n 列 8×8 */
+  .realms-invite-badge {
+    position: absolute;
+    left: 4px;
+    top: 12px;
+    width: 8px;
+    height: 8px;
+    background-image: url('assets/realms/invitation_icons.png');
+    background-size: 48px 16px;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    display: none;
+    animation: realm-icon-bob 2s ease-in-out infinite;
+  }
+
+  @keyframes realm-icon-bob {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-4px); }
+  }
+
+  /* ==========================================================
+     服务器列表：从 y=32 到 height-40
+     ========================================================== */
+  .realms-list-wrap {
+    position: absolute;
+    left: 50%;
+    top: 32px;
+    bottom: 40px;
+    transform: translateX(-50%);
+    width: 340px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  .realms-list {
+    width: 100%;
+  }
+
+  .realms-entry {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 36px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    cursor: pointer;
+    user-select: none;
+  }
+  .realms-entry:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+  }
+  .realms-entry.selected {
+    background-color: rgba(255, 255, 255, 0.14);
+    outline: 1px solid #ffffff;
+    outline-offset: -1px;
+  }
+
+  .realms-status {
+    flex: 0 0 10px;
+    width: 10px;
+    height: 28px;
+    margin-right: 4px;
+    background-position: 0 0;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    cursor: help;
+  }
+  .realms-status[data-state="open"]    { background-image: url('assets/realm_status/open.png');       background-size: 10px 28px; }
+  .realms-status[data-state="closed"]  { background-image: url('assets/realm_status/closed.png');     background-size: 10px 28px; }
+  .realms-status[data-state="expired"] { background-image: url('assets/realm_status/expired.png');    background-size: 10px 28px; }
+  .realms-status[data-state="expires_soon"] {
+    background-image: url('assets/realm_status/expires_soon.png');
+    background-size: 10px 56px;
+    background-position: 0 0;
+    animation: realm-expires var(--realm-expires-duration, 1000ms) linear infinite;
+  }
+  @keyframes realm-expires {
+    0%,   49.99% { background-position: 0 0; }
+    50%,  100%   { background-position: 0 -28px; }
+  }
+
+  .realms-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    padding-left: 2px;
+  }
+  .realms-name {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .realms-entry[data-state="expired"] .realms-name      { color: #808080; }
+  .realms-entry[data-state="open"]    .realms-name      { color: #55FF55; }
+  .realms-entry[data-state="closed"]  .realms-name      { color: #FF5555; }
+  .realms-entry[data-state="expires_soon"] .realms-name { color: #FFFFFF; }
+
+  .realms-desc {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #808080;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .realms-entry-actions {
+    flex: 0 0 auto;
+    display: none;
+    align-items: center;
+  }
+  .realms-entry:hover .realms-entry-actions,
+  .realms-entry.selected .realms-entry-actions {
+    display: flex;
+  }
+
+  .realms-action {
+    width: 28px;
+    height: 28px;
+    background-size: 56px 28px;
+    background-repeat: no-repeat;
+    background-position: 0 0;
+    image-rendering: pixelated;
+    cursor: pointer;
+  }
+.realms-action.configure {
+  background-image: url('assets/realms/configure_icon.png');
+  background-size: 56px 28px;
+  background-position: 0 0;
+}
+.realms-action.configure:hover {
+  background-position: -28px 0;
+}
+ .realms-action.leave {
+  background-image: url('assets/realms/leave_icon.png');
+  background-size: 56px 28px;
+  background-position: 0 0;
+}
+.realms-action.leave:hover {
+  background-position: -28px 0;
+}
+
+  /* ==========================================================
+     底部按钮 —— Play (w/2-98) + Back (w/2+6)，98×20 → mcbtn-half
+     ========================================================== */
+  .realms-footer {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+  }
+
+  /* ==========================================================
+     空状态弹窗
+     ========================================================== */
+  /* darken.png 是 1×1 像素，拉伸到全屏，配合 0.7 alpha */
+  .realms-darken {
+    position: absolute;
+    left: 0; top: 32px;
+    right: 0; bottom: 40px;
+    background-image: url('assets/realms/darken.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    opacity: 0.7;
+    display: none;
+  }
+  .realms-darken.visible { display: block; }
+
+  .realms-popup {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) translateY(-3px);
+    width: 310px;
+    height: 166px;
+    background-image: url('assets/realms/popup.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    display: none;
+  }
+  .realms-popup.visible { display: block; }
+
+  /* 轮播图 (xo+7, yo+7) 195×152
+     多数图片 780×608 → 恰好 4:1；
+     flower_mountain 760×593 略小 → cover 会轻微裁边 */
+  .realms-popup-carousel {
+    position: absolute;
+    left: 7px;
+    top: 7px;
+    width: 195px;
+    height: 152px;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+  }
+
+  .realms-popup-desc {
+    position: absolute;
+    left: 207px;
+    top: 7px;
+    width: 96px;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 10px;
+    color: #4C4C4C;
+    text-shadow: none;
+    white-space: normal;
+    word-break: break-word;
+    pointer-events: none;
+  }
+
+  .realms-popup-buttons {
+    position: absolute;
+    left: 207px;
+    top: 117px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+
+  .realms-popup-close {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  background-image: url('assets/realms/cross_icon.png');
+  background-size: 12px 24px;
+  background-position: 0 0;   /* 帧 0：上方 */
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  cursor: pointer;
+  display: none;
+  z-index:2;
+}
+.realms-popup-close.visible { display: block; }
+.realms-popup-close:hover {
+  background-position: 0 -12px;   /* 帧 1：下方（竖向切换）*/
+}
+
+  /* ==========================================================
+     Tooltip
+     ========================================================== */
+  .realms-tooltip {
+    position: fixed;
+    z-index: 9999;
+    max-width: 220px;
+    padding: 3px 5px;
+    background: rgba(0, 0, 0, 0.85);
+    color: #ffffff;
+    font-family: 'Minecraft', monospace;
+    font-size: 10px;
+    line-height: 1.3;
+    white-space: pre-line;
+    pointer-events: none;
+    display: none;
+    box-shadow: 0 0 0 1px #2c2c2c;
+  }
+  .realms-tooltip.visible { display: block; }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="realms-root">
+
+  <div class="realms-logo"></div>
+
+<a class="realms-icon realms-icon-invite" id="realm-icon-invite"
+   href="realms_pending.html">
+  <div class="realms-invite-badge" id="realm-invite-badge"></div>
+</a>
+<a class="realms-icon realms-icon-news" id="realm-icon-news"
+   href="https://www.minecraft.net/en-us/article"
+   target="_blank" rel="noopener">
+  <div class="realms-news-dot" id="realm-news-dot"></div>
+</a>
+  <div class="realms-icon realms-icon-help" id="realm-icon-help"></div>
+
+  <div class="realms-list-wrap mc-scroll" id="realm-list-wrap">
+    <div class="realms-list" id="realm-list"></div>
+  </div>
+
+  <div class="realms-footer">
+    <button class="mcbtn mcbtn-half" id="btn-play" disabled>Play</button>
+    <a class="mcbtn mcbtn-half btn-back" id="btn-back" href="index.html">Back</a>
+  </div>
+
+  <div class="realms-darken" id="realm-darken"></div>
+  <div class="realms-popup" id="realm-popup">
+    <div class="realms-popup-close" id="realm-popup-close"></div>
+    <div class="realms-popup-carousel" id="realm-popup-carousel"></div>
+    <div class="realms-popup-desc" id="realm-popup-desc"></div>
+    <div class="realms-popup-buttons" id="realm-popup-buttons"></div>
+  </div>
+
+</div>
+
+<div class="realms-tooltip" id="realm-tooltip"></div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     Cookie 工具 —— 和主菜单 show_realm.js 共用同一份 cookie
+       realms_news    '' | '1'
+       realms_invite  '' | '0' | '1'
+       realms_trial   '' | '1'
+     ========================================================== */
+  function getCookie(name) {
+    var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? decodeURIComponent(m[2]) : '';
+  }
+  function setCookie(name, value, days) {
+    var d = new Date();
+    d.setTime(d.getTime() + (days || 365) * 86400000);
+    document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/';
+  }
+  function delCookie(name) {
+    document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+  }
+
+  var STORAGE_KEY     = 'mc_realms';
+  var STORAGE_VERSION = 3;
+  var VERSION_KEY     = 'mc_realms_version';
+  var FN_KEY          = '__fn__';
+
+  /* ==========================================================
+     硬编码文案（Realms 无 i18n）
+     ========================================================== */
+  var TXT = {
+    play:            'Play',
+    back:            'Back',
+    buy:             'Buy a realm!',
+    trial:           'Get a trial!',
+    info:            'What is Realms?',
+    close:           'Close',
+    expired:         'Expired realm',
+    open:            'Open realm',
+    closed:          'Closed realm',
+    expiresSoon:     'Expires soon',
+    expiresDay:      'Expires in a day',
+    expiresDays:     'Expires in %s days',
+    configure:       'Configure realm',
+    leave:           'Leave realm',
+    popup:           'Realms is a safe, simple way to enjoy an online Minecraft world with up to ten friends at a time.   It supports loads of minigames and plenty of custom worlds! Only the owner of the realm needs to pay.',
+    news:            'Realms news',
+    invitesPending:  'New invites!',
+    invitesNone:     'No pending invites!'
+  };
+
+  /* ==========================================================
+     弹窗轮播图（17 张）
+     ========================================================== */
+  var CAROUSEL = [
+    'assets/realm_images/sand_castle.png',
+    'assets/realm_images/factory_floor.png',
+    'assets/realm_images/escher_tunnel.png',
+    'assets/realm_images/tree_houses.png',
+    'assets/realm_images/balloon_trip.png',
+    'assets/realm_images/halloween_woods.png',
+    'assets/realm_images/flower_mountain.png',
+    'assets/realm_images/dornenstein_estate.png',
+    'assets/realm_images/desert.png',
+    'assets/realm_images/gray.png',
+    'assets/realm_images/imperium.png',
+    'assets/realm_images/ludo.png',
+    'assets/realm_images/makersspleef.png',
+    'assets/realm_images/negentropy.png',
+    'assets/realm_images/pumpkin_party.png',
+    'assets/realm_images/sparrenhout.png',
+    'assets/realm_images/spindlewood.png'
+  ];
+
+  /* ==========================================================
+     读 expires_soon.png.mcmeta → 动画周期
+     ========================================================== */
+  function loadRealmExpiresMeta() {
+    fetch('assets/realm_status/expires_soon.png.mcmeta')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(json) {
+        if (!json || !json.animation) return;
+        var anim = json.animation;
+        var frametime = parseInt(anim.frametime, 10);
+        if (!(frametime > 0)) frametime = 10;
+        var frameH = parseInt(anim.height, 10) || 28;
+        var frameCount = Math.max(1, Math.floor(56 / frameH));
+        var periodMs = frametime * 50 * frameCount;
+        document.documentElement.style.setProperty(
+          '--realm-expires-duration', periodMs + 'ms'
+        );
+      })
+      .catch(function() {});
+  }
+
+  /* ==========================================================
+     数据
+     ========================================================== */
+  var DEFAULT_DATA = {
+    trialAvailable: true,
+    createdTrial: false,
+    hasUnreadNews: false,
+    newsLink: '',
+    pendingInvites: 2,
+    ownUUID: 'self-uuid',
+    servers: [
+      {
+        id: 'realm_test1',
+        name: 'Test Realm',
+        description: 'Survival world',
+        ownerUUID: 'self-uuid',
+        state: 'open',
+        daysLeft: 30,
+        players: { online: 3, max: 10 },
+        onJoin:      function() { alert('Join: '      + this.name); },
+        onConfigure: function() { alert('Configure: ' + this.name); }
+      },
+      {
+        id: 'realm_test2',
+        name: 'Expiring Realm',
+        description: 'About to expire',
+        ownerUUID: 'self-uuid',
+        state: 'open',
+        daysLeft: 5,
+        players: { online: 0, max: 10 },
+        onJoin: function() { alert('Join: ' + this.name); }
+      },
+      {
+        id: 'realm_test3',
+        name: 'Closed Realm',
+        description: 'Currently closed',
+        ownerUUID: 'other-uuid',
+        state: 'closed',
+        players: { online: 0, max: 10 }
+      },
+      {
+        id: 'realm_test4',
+        name: 'Expired Realm',
+        description: 'Subscription ended',
+        ownerUUID: 'self-uuid',
+        expired: true,
+        state: 'open'
+      }
+    ],
+
+  };
+
+  /* ==========================================================
+     序列化 / 反序列化
+     ========================================================== */
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) { console.warn('[realms] revive fn failed:', k, e); }
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var oldVer = parseInt(localStorage.getItem(VERSION_KEY) || '0', 10);
+      if (oldVer !== STORAGE_VERSION) {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.setItem(VERSION_KEY, String(STORAGE_VERSION));
+      }
+    } catch (e) {}
+
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var obj = JSON.parse(raw);
+        if (obj && typeof obj === 'object') return deserialize(obj);
+      }
+    } catch (e) {}
+
+    saveData(DEFAULT_DATA);
+    return DEFAULT_DATA;
+  }
+
+  function saveData(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data))); } catch (e) {}
+  }
+
+  var DATA = loadData();
+
+  /* ==========================================================
+     与主菜单同步（show_realm.js 的 cookie）
+     - 主菜单 → 这里：读 cookie 覆盖 DATA 的对应字段
+     - 这里 → 主菜单：改 DATA 时写回 cookie
+     ========================================================== */
+  function syncFromMainMenu() {
+    var inviteCookie = getCookie('realms_invite');   /* '' | '0' | '1' */
+    var newsCookie   = getCookie('realms_news');     /* '' | '1' */
+    var trialCookie  = getCookie('realms_trial');    /* '' | '1' */
+
+    /* invite：
+       '1' → 有 pending invites（数字 ≥ 1）
+       '0' → 无 pending invites（清空）
+       ''  → cookie 未设，不动 DATA（用 localStorage 里的值） */
+    if (inviteCookie === '1' && DATA.pendingInvites <= 0) {
+      DATA.pendingInvites = 1;
+    } else if (inviteCookie === '0') {
+      DATA.pendingInvites = 0;
+    }
+
+    /* news：'1' → 有未读；'' 保持 DATA 原值 */
+    if (newsCookie === '1') {
+      DATA.hasUnreadNews = true;
+    }
+
+    /* trial：'1' → 有 trial */
+    if (trialCookie === '1') {
+      DATA.trialAvailable = true;
+    }
+  }
+
+  function syncToMainMenu() {
+    /* pendingInvites → cookie */
+    if (DATA.pendingInvites > 0) {
+      setCookie('realms_invite', '1');
+    } else {
+      /* 只在原 cookie 有值时才写成 '0'，否则删掉让主菜单隐藏图标 */
+      if (getCookie('realms_invite') !== '') {
+        setCookie('realms_invite', '0');
+      }
+    }
+
+    /* hasUnreadNews → cookie */
+    if (DATA.hasUnreadNews) {
+      setCookie('realms_news', '1');
+    } else {
+      if (getCookie('realms_news') !== '') {
+        delCookie('realms_news');
+      }
+    }
+
+    /* trialAvailable → cookie */
+    if (DATA.trialAvailable && !DATA.createdTrial) {
+      setCookie('realms_trial', '1');
+    } else {
+      if (getCookie('realms_trial') !== '') {
+        delCookie('realms_trial');
+      }
+    }
+  }
+
+  /* 启动时先同步一次 */
+  syncFromMainMenu();
+
+  /* ==========================================================
+     状态推导
+     ========================================================== */
+  function effectiveState(server) {
+    if (!server) return 'closed';
+    if (server.expired) return 'expired';
+    if (server.state === 'closed') return 'closed';
+    if (server.state === 'open') {
+      var d = server.daysLeft;
+      if (d != null && d < 7) return 'expires_soon';
+      return 'open';
+    }
+    return 'closed';
+  }
+
+  function isSelfOwned(server) {
+    return server && server.ownerUUID === DATA.ownUUID;
+  }
+
+  function shouldPlayButtonBeActive(server) {
+    return !!server && !server.expired && server.state === 'open';
+  }
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var inviteIconEl   = document.getElementById('realm-icon-invite');
+  var inviteBadgeEl  = document.getElementById('realm-invite-badge');
+  var newsIconEl     = document.getElementById('realm-icon-news');
+  var helpIconEl     = document.getElementById('realm-icon-help');
+  var listEl         = document.getElementById('realm-list');
+  var btnPlay        = document.getElementById('btn-play');
+  var btnBack        = document.getElementById('btn-back');
+  var darkenEl       = document.getElementById('realm-darken');
+  var popupEl        = document.getElementById('realm-popup');
+  var popupCloseEl   = document.getElementById('realm-popup-close');
+  var popupCarousel  = document.getElementById('realm-popup-carousel');
+  var popupDescEl    = document.getElementById('realm-popup-desc');
+  var popupBtnsEl    = document.getElementById('realm-popup-buttons');
+  var tooltipEl      = document.getElementById('realm-tooltip');
+var newsDotEl = document.getElementById('realm-news-dot');
+  /* 邀请图标位置：width/2 + 50 */
+  function layoutTopIcons() {
+    var scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
+    var innerW = window.innerWidth / scale;
+    inviteIconEl.style.left = ((innerW / 2) + 50) + 'px';
+  }
+
+  /* ==========================================================
+     选中
+     ========================================================== */
+  var selected = null;
+  var popupOpenedByUser = false;
+
+  function setSelected(server) {
+    selected = server || null;
+    var all = listEl.querySelectorAll('.realms-entry');
+    for (var i = 0; i < all.length; i++) {
+      all[i].classList.toggle('selected', all[i]._data === selected);
+    }
+    updateFooterState();
+  }
+
+  function updateFooterState() {
+    btnPlay.disabled = !shouldPlayButtonBeActive(selected);
+  }
+
+  /* ==========================================================
+     列表
+     ========================================================== */
+  function shouldShowPopup() {
+    var servers = DATA.servers || [];
+    if (popupOpenedByUser) return true;
+    if (DATA.trialsAvailable && !DATA.createdTrial && servers.length === 0) return true;
+    return servers.length === 0;
+  }
+
+  function render() {
+    listEl.innerHTML = '';
+    var servers = DATA.servers || [];
+    for (var i = 0; i < servers.length; i++) {
+      listEl.appendChild(renderEntry(servers[i]));
+    }
+    if (selected && servers.indexOf(selected) < 0) selected = null;
+    setSelected(selected);
+
+    layoutTopIcons();
+    renderPopup();
+    updateIconBadges();
+  }
+
+  function updateIconBadges() {
+    if (DATA.pendingInvites > 0) {
+      var n = Math.min(DATA.pendingInvites, 6);
+      inviteBadgeEl.style.display = 'block';
+      inviteBadgeEl.style.backgroundPosition = (-(n - 1) * 8) + 'px 0';
+    } else {
+      inviteBadgeEl.style.display = 'none';
+    }
+
+    newsIconEl.dataset.unread = DATA.hasUnreadNews ? '1' : '0';
+  }
+
+  function renderEntry(server) {
+    if (typeof server.onUpdate === 'function') {
+      try { server.onUpdate.call(server); }
+      catch (e) { console.error('[realms] onUpdate', e); }
+    }
+
+    var state = effectiveState(server);
+
+    var el = document.createElement('div');
+    el.className = 'realms-entry';
+    el.dataset.state = state;
+    el._data = server;
+
+    var statusEl = document.createElement('div');
+    statusEl.className = 'realms-status';
+    statusEl.dataset.state = state;
+    el.appendChild(statusEl);
+
+    var infoEl = document.createElement('div');
+    infoEl.className = 'realms-info';
+
+    var nameEl = document.createElement('div');
+    nameEl.className = 'realms-name';
+    nameEl.textContent = server.name || '';
+    infoEl.appendChild(nameEl);
+
+    var descText = server.description || '';
+    if (server.players) {
+      descText += (descText ? '  ' : '') +
+                  server.players.online + '/' + server.players.max;
+    }
+    var descEl = document.createElement('div');
+    descEl.className = 'realms-desc';
+    descEl.textContent = descText;
+    infoEl.appendChild(descEl);
+
+    el.appendChild(infoEl);
+
+    var actionsEl = document.createElement('div');
+    actionsEl.className = 'realms-entry-actions';
+
+    if (isSelfOwned(server)) {
+      var cfg = document.createElement('div');
+      cfg.className = 'realms-action configure';
+      cfg.addEventListener('click', function(e) {
+  e.stopPropagation();
+  setSelected(server);      /* ← 先选中这一行 */
+  fireConfigure(server);
+});
+      actionsEl.appendChild(cfg);
+    } else {
+      var lv = document.createElement('div');
+      lv.className = 'realms-action leave';
+lv.addEventListener('click', function(e) {
+  e.stopPropagation();
+  setSelected(server);      /* ← 先选中这一行 */
+  fireLeave(server);
+});
+      actionsEl.appendChild(lv);
+    }
+    el.appendChild(actionsEl);
+
+    el.addEventListener('click', function() { setSelected(server); });
+    el.addEventListener('dblclick', function() {
+      setSelected(server);
+      if (!shouldPlayButtonBeActive(server)) return;
+      fireJoin(server);
+    });
+
+    statusEl.addEventListener('mouseenter', function() { showStatusTooltip(server); });
+    statusEl.addEventListener('mouseleave', hideTooltip);
+
+    return el;
+  }
+
+  /* ==========================================================
+     弹窗
+     ========================================================== */
+  var carouselIndex = 0;
+  var carouselTimer = null;
+
+  function startCarousel() {
+    if (carouselTimer) return;
+    carouselTimer = setInterval(function() {
+      carouselIndex = (carouselIndex + 1) % CAROUSEL.length;
+      popupCarousel.style.backgroundImage = 'url("' + CAROUSEL[carouselIndex] + '")';
+    }, 4750);
+  }
+  function stopCarousel() {
+    if (carouselTimer) { clearInterval(carouselTimer); carouselTimer = null; }
+  }
+
+  function renderPopup() {
+    var show = shouldShowPopup();
+
+    if (show) {
+      darkenEl.classList.add('visible');
+      popupEl.classList.add('visible');
+      popupCloseEl.classList.toggle('visible', popupOpenedByUser);
+
+      popupCarousel.style.backgroundImage = 'url("' + CAROUSEL[carouselIndex] + '")';
+      startCarousel();
+
+      popupDescEl.textContent = TXT.popup;
+
+      popupBtnsEl.innerHTML = '';
+      var trialsAvailable = DATA.trialAvailable && !DATA.createdTrial;
+
+if (trialsAvailable) {
+  var btnTry = document.createElement('a');
+  btnTry.className = 'mcbtn mcbtn-half';        /* 默认 <a>，无特殊 class */
+  btnTry.href = 'realms_create_trial.html';
+  btnTry.textContent = TXT.trial;
+  popupBtnsEl.appendChild(btnTry);
+  popupBtnsEl.style.top = '107px';
+} else {
+  popupBtnsEl.style.top = '117px';
+}
+
+var btnBuy = document.createElement('button');
+btnBuy.className = 'mcbtn mcbtn-half';
+btnBuy.textContent = TXT.buy;
+btnBuy.addEventListener('click', function() {
+  window.open('https://minecraft.net/realms', '_blank');
+});
+popupBtnsEl.appendChild(btnBuy);
+      btnPlay.style.display = 'none';
+    } else {
+      stopCarousel();
+      darkenEl.classList.remove('visible');
+      popupEl.classList.remove('visible');
+      btnPlay.style.display = '';
+    }
+  }
+
+  popupCloseEl.addEventListener('click', function() {
+    popupOpenedByUser = false;
+    render();
+  });
+
+  document.addEventListener('pointerdown', function(e) {
+    if (!popupEl.classList.contains('visible')) return;
+    if (!popupOpenedByUser) return;
+    if (popupEl.contains(e.target)) return;
+    if (helpIconEl.contains(e.target)) return;
+    popupOpenedByUser = false;
+    render();
+  }, true);
+
+  /* ==========================================================
+     Handle
+     ========================================================== */
+  function fireJoin(server) {
+    if (server && typeof server.onJoin === 'function') {
+      try { server.onJoin.call(server); return; }
+      catch (e) { console.error('[realms] onJoin', e); }
+    }
+  }
+
+ function fireConfigure(server) {
+  if (!isSelfOwned(server)) return;
+  if (typeof server.onConfigure === 'function') {
+    try { server.onConfigure.call(server); return; }
+    catch (e) { console.error('[realms] onConfigure', e); }
+  }
+  /* 未定义 handle → 什么都不做 */
+}
+
+  function fireLeave(server) {
+    if (typeof server.onLeave === 'function') {
+      try { server.onLeave.call(server); return; }
+      catch (e) { console.error('[realms] onLeave', e); }
+    }
+    var i = DATA.servers.indexOf(server);
+    if (i >= 0) DATA.servers.splice(i, 1);
+    saveData(DATA);
+    render();
+  }
+
+  /* ==========================================================
+     底部按钮
+     ========================================================== */
+  btnPlay.addEventListener('click', function() {
+    if (!selected) return;
+    if (!shouldPlayButtonBeActive(selected)) return;
+    fireJoin(selected);
+  });
+
+  /* ==========================================================
+     顶部图标
+     ========================================================== */
+
+  inviteIconEl.addEventListener('mouseenter', function() {
+    showTooltip(DATA.pendingInvites > 0 ? TXT.invitesPending : TXT.invitesNone);
+  });
+  inviteIconEl.addEventListener('mouseleave', hideTooltip);
+
+newsIconEl.addEventListener('click', function() {
+  /* 用户手点了 → 清未读，跳转交给 <a target="_blank"> 默认行为 */
+  if (DATA.hasUnreadNews) {
+    DATA.hasUnreadNews = false;
+    saveData(DATA);
+    syncToMainMenu();
+    if (newsDotEl) newsDotEl.style.display = 'none';
+  }
+});
+  newsIconEl.addEventListener('mouseenter', function() { showTooltip(TXT.news); });
+  newsIconEl.addEventListener('mouseleave', hideTooltip);
+
+  helpIconEl.addEventListener('click', function() {
+    popupOpenedByUser = !popupOpenedByUser;
+    render();
+  });
+  helpIconEl.addEventListener('mouseenter', function() { showTooltip(TXT.info); });
+  helpIconEl.addEventListener('mouseleave', hideTooltip);
+
+  /* ==========================================================
+     Tooltip
+     ========================================================== */
+  function showTooltip(text) {
+    if (!text) return;
+    tooltipEl.textContent = text;
+    tooltipEl.classList.add('visible');
+  }
+  function showStatusTooltip(server) {
+    var state = effectiveState(server);
+    var text = '';
+    if (state === 'expired') text = TXT.expired;
+    else if (state === 'closed') text = TXT.closed;
+    else if (state === 'open') text = TXT.open;
+    else if (state === 'expires_soon') {
+      var d = server.daysLeft;
+      if (d == null || d <= 0) text = TXT.expiresSoon;
+      else if (d === 1) text = TXT.expiresDay;
+      else text = TXT.expiresDays.replace('%s', d);
+    }
+    showTooltip(text);
+  }
+  function hideTooltip() { tooltipEl.classList.remove('visible'); }
+  document.addEventListener('mousemove', function(e) {
+    if (!tooltipEl.classList.contains('visible')) return;
+    var x = e.clientX + 12;
+    var y = e.clientY + 8;
+    var w = tooltipEl.offsetWidth;
+    if (x + w > window.innerWidth - 4) x = e.clientX - w - 12;
+    tooltipEl.style.left = x + 'px';
+    tooltipEl.style.top  = y + 'px';
+  });
+
+  /* ==========================================================
+     彩蛋：321456 / 987123 / 987456
+     ========================================================== */
+  var MCHARS = ['3', '2', '1', '4', '5', '6'];
+  var SCHARS = ['9', '8', '7', '1', '2', '3'];
+  var LCHARS = ['9', '8', '7', '4', '5', '6'];
+  var mindex = 0, sindex = 0, lindex = 0;
+  var overrideConfigure = false;
+  var currentEnvironment = 'PROD';
+
+  function handleEasterEgg(ch) {
+    if (ch === MCHARS[mindex]) {
+      mindex++;
+      if (mindex === MCHARS.length) {
+        mindex = 0;
+        overrideConfigure = !overrideConfigure;
+        console.log('[realms] overrideConfigure =', overrideConfigure);
+      }
+    } else mindex = 0;
+
+    if (ch === SCHARS[sindex]) {
+      sindex++;
+      if (sindex === SCHARS.length) {
+        sindex = 0;
+        currentEnvironment = (currentEnvironment === 'STAGE') ? 'PROD' : 'STAGE';
+        console.log('[realms] environment =', currentEnvironment);
+      }
+    } else sindex = 0;
+
+    if (ch === LCHARS[lindex]) {
+      lindex++;
+      if (lindex === LCHARS.length) {
+        lindex = 0;
+        currentEnvironment = (currentEnvironment === 'LOCAL') ? 'PROD' : 'LOCAL';
+        console.log('[realms] environment =', currentEnvironment);
+      }
+    } else lindex = 0;
+  }
+
+  /* ==========================================================
+     键盘
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      if (popupOpenedByUser) {
+        popupOpenedByUser = false;
+        render();
+        return;
+      }
+      location.href = 'index.html';
+      return;
+    }
+
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (shouldShowPopup()) return;
+      var servers = DATA.servers || [];
+      if (servers.length === 0) return;
+      var idx = servers.indexOf(selected);
+      if (idx < 0) idx = 0;
+      else idx += (e.key === 'ArrowUp' ? -1 : 1);
+      if (idx < 0) idx = 0;
+      if (idx >= servers.length) idx = servers.length - 1;
+      setSelected(servers[idx]);
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (shouldShowPopup()) return;
+      if (!selected) return;
+      if (e.shiftKey) fireConfigure(selected);
+      else if (shouldPlayButtonBeActive(selected)) fireJoin(selected);
+      return;
+    }
+
+    if (e.key && e.key.length === 1) handleEasterEgg(e.key);
+  }, true);
+
+  /* ==========================================================
+     对外 API
+     ========================================================== */
+  window.mcRealms = {
+    getData:  function() { return DATA; },
+    save:     function() { saveData(DATA); syncToMainMenu(); },
+    refresh:  function() { render(); },
+    select:   function(s) { setSelected(s); },
+    closePopup: function() { popupOpenedByUser = false; render(); },
+
+    addServer: function(s) {
+      DATA.servers.push(s); saveData(DATA); syncToMainMenu(); render();
+    },
+    removeServer: function(s) {
+      var i = DATA.servers.indexOf(s);
+      if (i >= 0) DATA.servers.splice(i, 1);
+      saveData(DATA); syncToMainMenu(); render();
+    },
+
+    /* 供子页面（如 realms_pending.html）改完数据后同步回主菜单 */
+    syncToMainMenu: syncToMainMenu,
+    syncFromMainMenu: syncFromMainMenu,
+
+    reset: function() {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(VERSION_KEY);
+      } catch (e) {}
+      location.reload();
+    }
+  };
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  loadRealmExpiresMeta();
+  render();
+
+  window.addEventListener('resize', function() { layoutTopIcons(); });
+
+})();
+</script>
+
+</body>
+</html>

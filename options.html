@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Options</title>
+
+<style>html,body{margin:0;padding:0;background:#000;overflow:hidden;}</style>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<link rel="stylesheet" href="css/options_screen.css">
+
+<script src="js/font.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="options-screen">
+
+  <div class="options-header">
+    <div class="options-title" data-i18n="options.title">Options</div>
+    <div class="options-subheader">
+      <!-- FOV slider：源码 options.fov().createButton()，150 宽 -->
+      <div class="mc-slider" id="fov-slider"
+           data-min="30" data-max="110" data-step="1" data-value="70">
+        <div class="mc-slider-track"></div>
+        <div class="mc-slider-handle"></div>
+        <span class="mc-options-slider-label"></span>
+      </div>
+
+      <!-- Online 按钮：源码 createOnlineButton()，150 宽 -->
+      <a class="mcbtn mcbtn-150" href="online.html" data-i18n="options.online">Online...</a>
+    </div>
+  </div>
+
+  <div class="options-content mc-scroll" id="options-grid"></div>
+
+  <div class="options-footer">
+    <a class="mcbtn mcbtn-long btn-back" href="index.html" data-i18n="gui.done">Done</a>
+  </div>
+
+</div>
+
+
+<script src="js/options_screen.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+/* ==========================================================
+   Slider（200×20 轨道 + 8×20 手柄）
+   ========================================================== */
+.mc-slider {
+  position: relative;
+  width: 200px;
+  height: 20px;
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+  display: inline-block;
+  vertical-align: middle;
+  outline: none;
+}
+
+.mc-slider .mc-slider-track {
+  position: absolute;
+  inset: 0;
+  background-image: url('../assets/slider/slider.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+/* 源码：轨道高亮 = active && focused && !canChangeValue
+   网页近似：聚焦时高亮 */
+.mc-slider:focus .mc-slider-track {
+  background-image: url('../assets/slider/slider_highlighted.png');
+}
+
+.mc-slider .mc-slider-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 20px;
+  background-image: url('../assets/slider/slider_handle.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+/* 源码：手柄高亮 = active && (hovered || canChangeValue)
+   网页近似：悬浮或拖动时高亮 */
+.mc-slider:hover .mc-slider-handle,
+.mc-slider.dragging .mc-slider-handle {
+  background-image: url('../assets/slider/slider_handle_highlighted.png');
+}
+
+.mc-slider.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ==========================================================
+   Scroller（原生滚动条）
+   颜色取自 scroller.png 直方图：
+     #C0C0C0 — 主体
+     #808080 — 右下 L 型阴影
+   ========================================================== */
+
+.mc-scroll {
+  --sb-w: calc(6px * var(--ui-scale, 1));
+  scrollbar-width: thin;
+  scrollbar-color: #C0C0C0 #000;
+}
+
+.mc-scroll::-webkit-scrollbar {
+  width: var(--sb-w);
+  height: var(--sb-w);
+}
+
+.mc-scroll::-webkit-scrollbar-track {
+  background: #000;
+}
+
+.mc-scroll::-webkit-scrollbar-thumb {
+  background-color: #C0C0C0;
+  box-shadow:
+    inset 0 -1px 0 #808080,
+    inset -1px 0 0 #808080;
+  border: none;
+}
+
+.mc-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #D4D4D4;
+}
+
+.mc-scroll::-webkit-scrollbar-thumb:active {
+  background-color: #B0B0B0;
+  box-shadow:
+    inset 0 1px 0 #808080,
+    inset 1px 0 0 #808080;
+}
+
+.mc-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.mc-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+/* ============ 310×20 整行 Slider（对应源码 addBig） ============ */
+.mc-slider-310 {
+  width: 310px;
+}
+.mc-slider-310 .mc-slider-track {
+  background-image: url('../assets/slider/slider_310.png');
+}
+.mc-slider-310:focus .mc-slider-track {
+  background-image: url('../assets/slider/slider_highlighted_310.png');
+}

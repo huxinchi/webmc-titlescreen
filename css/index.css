@@ -1,0 +1,94 @@
+.version-text {
+  position: absolute;
+  left: calc(2px * var(--ui-scale, 1));
+  bottom: 0;
+  height: 10px;
+  line-height: 10px;
+  font-family: 'Minecraft', monospace;
+  font-size: 10px;
+  color: #fff;
+  text-shadow: 1px 1px 0 #3f3f3f;
+  pointer-events: none;
+  white-space: nowrap;
+
+  transform-origin: left bottom;
+  transform: scale(var(--ui-scale, 1));
+  will-change: transform;
+}
+
+.copyright-text {
+  position: absolute;
+  right: calc(2px * var(--ui-scale, 1));
+  bottom: 0;
+  height: 10px;
+  line-height: 10px;
+  font-family: 'Minecraft', monospace;
+  font-size: 10px;
+  color: #fff;
+  text-shadow: 1px 1px 0 #3f3f3f;
+  cursor: pointer;
+  white-space: nowrap;
+  background: none; border: none; padding: 0;
+
+  transform-origin: right bottom;
+  transform: scale(var(--ui-scale, 1));
+  will-change: transform;
+}
+/* ============ 内容容器（逻辑坐标系 + 缩放） ============ */
+.screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width:  calc(100vw / var(--ui-scale, 1));
+  height: calc(100vh / var(--ui-scale, 1));
+  transform: scale(var(--ui-scale, 1));
+  transform-origin: top left;
+  /* 不用 flex，按钮用绝对定位 */
+}
+
+/* ==========================================================
+   主菜单元素绝对定位（对照 TitleScreen.java）
+   ========================================================== */
+
+/* Logo：水平居中，中心在屏幕 25% 处 */
+.logo {
+  position: absolute;
+  left: 50%;
+  top: 25%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 0;   /* 覆盖 logos.css 的 26px */
+}
+
+/* --- 200×20 三个长按钮 --- */
+#sstart,
+#mstart,
+#realms {
+  position: absolute;
+  left: calc(50% - 100px);
+}
+#sstart { top: calc(25% + 48px); }   /* 单人游戏 */
+#mstart { top: calc(25% + 72px); }   /* 多人游戏 */
+#realms { top: calc(25% + 96px); }   /* Minecraft Realms */
+
+/* --- 20×20 三个图标按钮（水平间距 24，共宽 68） --- */
+#friends,
+#lang,
+#accessibility {
+  position: absolute;
+  top: calc(25% + 120px);
+}
+#friends        { left: calc(50% - 34px); }   /* 中心 = 50% - 24 */
+#lang           { left: calc(50% - 10px); }   /* 中心 = 50% */
+#accessibility  { left: calc(50% + 14px); }   /* 中心 = 50% + 24 */
+
+/* --- 98×20 底部两个按钮 --- */
+#option,
+#exit {
+  position: absolute;
+  top: calc(25% + 144px);
+}
+#option { left: calc(50% - 100px); }   /* 和上面长按钮左对齐 */
+#exit   { left: calc(50% + 2px); }     /* 和上面长按钮右对齐 */

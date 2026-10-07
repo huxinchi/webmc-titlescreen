@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Controls</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<link rel="stylesheet" href="css/options_screen.css">
+<script src="js/font.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="options-screen">
+  <div class="options-header">
+    <div class="options-title" data-i18n="controls.title">Controls</div>
+  </div>
+  <div class="options-content mc-scroll" id="opts-list"></div>
+  <div class="options-footer">
+    <a class="mcbtn mcbtn-long btn-back" href="options.html" data-i18n="gui.done">Done</a>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+<script>
+(function() {
+  'use strict';
+  var listEl = document.getElementById('opts-list');
+  if (!listEl || !window.mcWidgets || !window.mcWidgets.OptionsList) return;
+
+var OPTIONS = {
+  'options.mouse_settings': { type: 'button', href: 'mouse.html' },
+  'controls.keybinds':      { type: 'button', href: 'keybinds.html' },
+
+  'key.sneak': {
+    type: 'enum',
+    values: [true, false],
+    value: false,
+    valueMap: {
+      'true':  'options.key.toggle',
+      'false': 'options.key.hold'
+    }
+  },
+  'key.sprint': {
+    type: 'enum',
+    values: [true, false],
+    value: false,
+    valueMap: {
+      'true':  'options.key.toggle',
+      'false': 'options.key.hold'
+    }
+  },
+  'key.attack': {
+    type: 'enum',
+    values: [true, false],
+    value: false,
+    valueMap: {
+      'true':  'options.key.toggle',
+      'false': 'options.key.hold'
+    }
+  },
+  'key.use': {
+    type: 'enum',
+    values: [true, false],
+    value: false,
+    valueMap: {
+      'true':  'options.key.toggle',
+      'false': 'options.key.hold'
+    }
+  },
+
+  'options.autoJump':         { type: 'boolean', value: false },
+  'options.sprintWindow':     { type: 'slider', min: 0, max: 10, step: 1, value: 7, format: 'intOrOff' },
+  'options.operatorItemsTab': { type: 'boolean', value: false }
+};
+var ROWS = [
+  ['options.mouse_settings',  'controls.keybinds'],
+  ['key.sneak',               'key.sprint'],
+  ['key.attack',              'key.use'],
+  ['options.autoJump',        'options.sprintWindow'],
+  ['options.operatorItemsTab']
+];
+
+  new window.mcWidgets.OptionsList(listEl, { options: OPTIONS, rows: ROWS });
+})();
+</script>
+</body>
+</html>

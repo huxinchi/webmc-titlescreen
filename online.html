@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Online</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<link rel="stylesheet" href="css/options_screen.css">
+<script src="js/font.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="options-screen">
+  <div class="options-header">
+    <div class="options-title" data-i18n="options.online.title">Online</div>
+  </div>
+  <div class="options-content mc-scroll" id="opts-list"></div>
+  <div class="options-footer">
+    <a class="mcbtn mcbtn-long btn-back" href="options.html" data-i18n="gui.done">Done</a>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+<script>
+(function() {
+  'use strict';
+  var listEl = document.getElementById('opts-list');
+  if (!listEl || !window.mcWidgets || !window.mcWidgets.OptionsList) return;
+
+var OPTIONS = {
+  'options.friendsList':         { type: 'boolean', value: false },
+  'options.allowFriendRequests': { type: 'boolean', value: false },
+  'options.inGameNotification':  { type: 'boolean', value: false },
+  'options.sharePresence':       { type: 'enum',
+                                   values: ['all','limited','none'],
+                                   value: 'all',
+                                   valueKey: 'options.sharePresence.' },
+  'options.allowServerListing':  { type: 'boolean', value: true },
+  'options.realmsNotifications.button': { type: 'boolean', value: true },
+    'options.online.xboxSettings': { type: 'button', href: 'https://aka.ms/MinecraftJavaXboxPrivacyAndSafety' } }
+};
+
+var ROWS = [
+  { header: 'options.online.friends.header' },
+  ['options.friendsList',         'options.allowFriendRequests'],
+  ['options.inGameNotification',  'options.sharePresence'],
+  { big:    'options.online.xboxSettings' },
+
+  { header: 'options.online.servers.header' },
+  { big:    'options.allowServerListing' },
+
+  { header: 'options.online.realms.header' },
+  { big:    'options.realmsNotifications.button' }
+];
+
+  new window.mcWidgets.OptionsList(listEl, { options: OPTIONS, rows: ROWS });
+})();
+</script>
+</body>
+</html>

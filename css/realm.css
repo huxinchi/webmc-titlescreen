@@ -1,0 +1,37 @@
+/* ============ Realms 通知图标 ============ */
+#realms {
+  position: relative;
+}
+
+.realms-notifications {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.realms-notif {
+  position: absolute;
+  display: none;                /* JS 决定显隐 */
+}
+
+#realms-news {
+  width: 16px;
+  height: 16px;
+}
+
+#realms-invite {
+  width: 15px;
+  height: 25px;
+  image-rendering: pixelated;
+}
+
+#realms-trial {
+  width: 8px;
+  height: 8px;
+  image-rendering: pixelated;
+}
+
+/* 按钮 disabled 时隐藏所有图标 */
+#realms:disabled .realms-notifications {
+  display: none;
+}

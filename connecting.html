@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Connecting...</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  /* 逻辑坐标系容器（对齐 Screen 的 width/height） */
+  .connect-screen {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  /* graphics.centeredText(font, status, width/2, height/2 - 50) */
+  .connect-status {
+    position: absolute;
+    left: 50%;
+    top: calc(50% - 50px);
+    transform: translate(-50%, -50%);
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    text-align: center;
+    user-select: none;
+    white-space: nowrap;
+    max-width: calc(100% - 40px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Button.bounds(width/2 - 100, height/4 + 120 + 12, 200, 20) */
+  .connect-screen #btn-cancel {
+    pointer-events: auto;
+    position: absolute;
+    left: calc(50% - 100px);
+    top: calc(25% + 132px);
+    width: 200px;
+    height: 20px;
+  }
+</style>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="connect-screen">
+  <div class="connect-status" id="connect-status"
+       data-i18n="connect.connecting">Connecting to the server...</div>
+  <button class="mcbtn mcbtn-long" id="btn-cancel" type="button"
+          data-i18n="gui.cancel">Cancel</button>
+</div>
+
+<script src="assets/servers/presets.js"></script>
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     阶段定义 —— 对齐 ClientHandshakePacketListenerImpl.State
+       CONNECTING    → connect.connecting
+       AUTHORIZING   → connect.authorizing
+       ENCRYPTING    → connect.encrypting
+       JOINING       → connect.joining
+
+     connect.negotiating 在原版中是 handleCustomQuery 单独 updateStatus，
+     生命周期夹在 AUTHORIZING 和 ENCRYPTING 之间，这里作为可选阶段，
+     需要就把它插在 ENCRYPTING 前。
+
+     duration：该阶段停留毫秒数（可自由调整）
+     ========================================================== */
+  var STAGES = [
+    { key: 'connect.connecting',  duration: 800 },
+    { key: 'connect.authorizing', duration: 600 },
+    { key: 'connect.encrypting',  duration: 400 },
+    { key: 'connect.joining',     duration: 600 }
+  ];
+
+  /* i18n 缺失时的 fallback（对齐 en_us.json） */
+  var FALLBACKS = {
+    'connect.connecting':  'Connecting to the server...',
+    'connect.authorizing': 'Logging in...',
+    'connect.encrypting':  'Encrypting...',
+    'connect.negotiating': 'Negotiating...',
+    'connect.joining':     'Joining world...',
+    'connect.transferring':'Transferring...',
+    'gui.cancel':          'Cancel'
+  };
+
+  var FN_KEY = '__fn__';
+
+  function t(key) {
+    var v = (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+    if (v === key && FALLBACKS[key] != null) return FALLBACKS[key];
+    return v;
+  }
+
+  /* ==========================================================
+     反序列化 —— 恢复 localStorage 里的函数字段
+     与 multiplayer.html 里的 serialize / deserialize 配对
+     ========================================================== */
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) { console.warn('[connecting] revive fn failed:', k, e); }
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  /* ==========================================================
+     参数
+     ========================================================== */
+  var params = new URLSearchParams(location.search);
+  var id     = params.get('id')   || '';
+  var addr   = params.get('addr') || '';
+
+  /* ==========================================================
+     找 join 目标
+       1. presets 按地址命中 → 用 preset（this 指向 preset）
+       2. localStorage 里按 id 找到 server → 用 server（this 指向 server）
+       3. 都没有 → null（调用方决定跳 disconnected）
+     ========================================================== */
+  function resolveJoinTarget() {
+    /* 1. presets */
+    if (addr && window.mcMatchPreset) {
+      var m = window.mcMatchPreset(addr);
+      if (m && m.preset && typeof m.preset.onJoin === 'function') {
+        return m.preset;
+      }
+    }
+
+    /* 2. localStorage 里的 server（按 id 匹配） */
+    if (id) {
+      try {
+        var raw = localStorage.getItem('mc_servers');
+        if (raw) {
+          var arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            for (var i = 0; i < arr.length; i++) {
+              if (arr[i] && arr[i].id === id) {
+                var s = deserialize(arr[i]);
+                /* 若地址也能命中 preset，优先用 preset */
+                var a2 = s.ip || s.address || s.name || '';
+                if (a2 && window.mcMatchPreset) {
+                  var m2 = window.mcMatchPreset(a2);
+                  if (m2 && m2.preset && typeof m2.preset.onJoin === 'function') {
+                    return m2.preset;
+                  }
+                }
+                if (typeof s.onJoin === 'function') return s;
+                break;
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    return null;
+  }
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var statusEl  = document.getElementById('connect-status');
+  var cancelEl  = document.getElementById('btn-cancel');
+
+  /* 状态文字随 i18n 就绪后自动更新 —— 用 MutationObserver 不必要，
+     直接监听 i18n-ready 重新应用当前 key 即可 */
+  var currentKey = STAGES[0].key;
+
+  function applyStatus() {
+    statusEl.textContent = t(currentKey);
+  }
+  applyStatus();
+  document.addEventListener('i18n-ready', applyStatus, false);
+
+  /* ==========================================================
+     状态机
+     ========================================================== */
+  var stageTimer = null;
+  var stageIndex = 0;
+  var aborted    = false;
+
+  function advanceStage() {
+    if (aborted) return;
+
+    if (stageIndex >= STAGES.length) {
+      finish();
+      return;
+    }
+
+    var stage = STAGES[stageIndex];
+    stageIndex++;
+
+    currentKey = stage.key;
+    applyStatus();
+
+    stageTimer = setTimeout(advanceStage, stage.duration);
+  }
+
+  /* ==========================================================
+     结束 —— 调用 onJoin
+     - 成功 → 执行 target.onJoin（this = target）
+     - 未找到 target → 回落 disconnected
+     - onJoin 抛错 → 回落 disconnected
+     ========================================================== */
+  function finish() {
+    if (aborted) return;
+
+    var target = resolveJoinTarget();
+
+    if (!target) {
+      /* 无 handle：跳断连页 */
+      goDisconnected();
+      return;
+    }
+
+    try {
+      target.onJoin.call(target);
+    } catch (e) {
+      console.error('[connecting] onJoin', e);
+      goDisconnected();
+      return;
+    }
+
+    /* onJoin 一般会自己跳走或弹 alert。如果它没跳（比如只是 alert），
+       给用户一点时间看提示，然后自动回到 multiplayer */
+    setTimeout(function() {
+      if (!aborted) goBack();
+    }, 500);
+  }
+
+  /* ==========================================================
+     取消 / 回落
+     ========================================================== */
+  function cancel() {
+    if (aborted) return;
+    aborted = true;
+    if (stageTimer) clearTimeout(stageTimer);
+
+    goBack();
+  }
+
+  function goBack() {
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('multiplayer.html');
+    } else {
+      location.href = 'multiplayer.html';
+    }
+  }
+
+  function goDisconnected() {
+    /* 用 mcBack.jump 保留 fromurl 栈，断连页的 Back 才能退回 multiplayer */
+    var url = 'disconnected.html?server=' + encodeURIComponent(addr || 'localhost:25565');
+    if (window.mcBack && typeof window.mcBack.jump === 'function') {
+      window.mcBack.jump(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  cancelEl.addEventListener('click', function(e) {
+    e.preventDefault();
+    cancel();
+  });
+
+  /* shouldCloseOnEsc() = false —— Esc 不取消 */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') e.preventDefault();
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  advanceStage();
+
+})();
+</script>
+
+</body>
+</html>

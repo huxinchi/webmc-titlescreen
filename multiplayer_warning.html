@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Multiplayer Warning</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  .warning-screen {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .warning-box {
+    max-width: calc(100% - 40px);
+    width: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    box-sizing: border-box;
+  }
+
+  .warning-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    font-weight: bold;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    text-align: center;
+    user-select: none;
+  }
+
+  .warning-message {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    color: #BABABE;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    line-height: 1.5;
+    text-align: center;
+    padding: 12px;
+    white-space: pre-line;
+    box-sizing: border-box;
+    max-width: 100%;
+  }
+
+  .warning-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    color: #E0E0E0;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    cursor: pointer;
+    user-select: none;
+  }
+  .warning-checkbox .mc-checkbox {
+    pointer-events: none;
+  }
+
+  .warning-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+
+
+</style>
+
+
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="warning-screen">
+  <div class="warning-box">
+
+    <div class="warning-title" data-i18n="multiplayerWarning.header">CAUTION: ONLINE PLAY</div>
+
+    <div class="warning-message" data-i18n="multiplayerWarning.message">
+      Online play is not rated and may not be suitable for all ages. You may be exposed to content created by other players, which is not rated or monitored by Mojang Studios.
+    </div>
+
+    <div class="warning-checkbox" id="check-row">
+      <div class="mc-checkbox" id="skip-check" data-checked="false"></div>
+      <span data-i18n="multiplayerWarning.check">Do not show this again</span>
+    </div>
+
+    <div class="warning-buttons">
+      <a class="mcbtn mcbtn-150 btn-jmp" id="btn-proceed" href="multiplayer.html"
+         data-i18n="gui.proceed">Proceed</a>
+      <a class="mcbtn mcbtn-150 btn-back" id="btn-back" href="index.html"
+         data-i18n="gui.back">Back</a>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var STORAGE_KEY = 'mc_friends_enabled';   /* 与本页无关，避免误用 */
+  var SKIP_OPT    = 'options.skipMultiplayerWarning';
+
+  /* 已跳过 → 直接去 multiplayer */
+  (function earlyRedirect() {
+    var skip = false;
+    if (window.mcOptions) {
+      skip = !!window.mcOptions.get(SKIP_OPT, false);
+    }
+    if (skip) {
+      location.replace('multiplayer.html');
+    }
+  })();
+
+  var checkRow  = document.getElementById('check-row');
+  var checkBox  = document.getElementById('skip-check');
+  var btnProceed = document.getElementById('btn-proceed');
+
+  /* 点整行切换复选框 */
+  checkRow.addEventListener('click', function() {
+    var checked = checkBox.dataset.checked === 'true';
+    checkBox.dataset.checked = checked ? 'false' : 'true';
+    try { checkBox.focus(); } catch (e) {}
+    checkBox.dispatchEvent(new CustomEvent('checkchange', {
+      bubbles: true,
+      detail: { checked: !checked }
+    }));
+  });
+
+  /* Proceed：只写 option，跳转交给 <a href> 默认行为 */
+  btnProceed.addEventListener('click', function() {
+    if (checkBox.dataset.checked === 'true' && window.mcOptions) {
+      window.mcOptions.set(SKIP_OPT, true);
+    }
+    /* 不 preventDefault —— 浏览器走 <a href="multiplayer.html"> */
+  });
+})();
+</script>
+
+</body>
+</html>

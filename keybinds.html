@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Key Binds</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<link rel="stylesheet" href="css/options_screen.css">
+<script src="js/font.js"></script>
+
+<style>
+  .kb-screen {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .kb-header {
+    flex: 0 0 33px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .kb-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .kb-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 2px 0;
+    background-image: url('assets/background/menu_list_background.png');
+    background-repeat: repeat;
+    background-size: 32px 32px;
+    image-rendering: pixelated;
+  }
+
+  .kb-footer {
+    flex: 0 0 33px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-sizing: border-box;
+  }
+
+  /* 分类标题：居中、加粗 */
+  .kb-category {
+    text-align: center;
+    color: #ffffff;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    font-weight: bold;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    padding: 8px 0 4px;
+    user-select: none;
+  }
+
+  /* 每行 20 高、宽 340 居中 */
+  .kb-entry {
+    display: flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 10px;
+    box-sizing: border-box;
+    position: relative;
+    max-width: 340px;
+    margin: 0 auto;
+  }
+
+  .kb-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* change / reset 按钮 */
+  .kb-change-btn,
+  .kb-reset-btn {
+    flex: 0 0 auto;
+    height: 20px;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    border: none;
+    padding: 0 2px;
+    cursor: pointer;
+    background-image: url('assets/button/button.png');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 100% 100%;
+    image-rendering: pixelated;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .kb-change-btn { width: 75px; margin-right: 5px; position: relative; }
+  .kb-reset-btn  { width: 50px; }
+
+  .kb-change-btn:hover,
+  .kb-change-btn:focus,
+  .kb-reset-btn:hover,
+  .kb-reset-btn:focus {
+    background-image: url('assets/button/button_highlighted.png');
+  }
+
+  .kb-change-btn:disabled,
+  .kb-reset-btn:disabled {
+    background-image: url('assets/button/button_disabled.png');
+    color: #a0a0a0;
+    cursor: not-allowed;
+  }
+
+/* 冲突竖条：挂在 .kb-entry 上，位置对齐 changeButton 左侧 6px 处 */
+.kb-entry.kb-has-collision::before {
+  content: '';
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  /* 从 padding box 右边缘算起：
+     右 padding 10 + reset 50 + margin 5 + change 75 + 竖条间隙 3 = 143 */
+  right: 143px;
+  width: 3px;
+  background: #FFFF00;
+}
+
+  /* 按钮里的彩色 span（覆盖 main.css 的 * { font-size: 16px }） */
+  .kb-change-btn span {
+    font-size: var(--font-size, 10px);
+    font-family: 'Minecraft', monospace;
+  }
+
+  .kb-col-yellow   { color: #FFFF55; }
+  .kb-col-white    { color: #FFFFFF; }
+  .kb-col-white-ul { color: #FFFFFF; text-decoration: underline; }
+
+
+</style>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="kb-screen">
+  <div class="kb-header">
+    <div class="kb-title" data-i18n="controls.keybinds.title">Key Binds</div>
+  </div>
+
+  <div class="kb-content mc-scroll" id="keybinds-list"></div>
+
+  <div class="kb-footer">
+    <button class="mcbtn mcbtn-150" id="btn-reset-all" data-i18n="controls.resetAll">Reset Keys</button>
+    <a class="mcbtn mcbtn-150 btn-back" href="controls.html" data-i18n="gui.done">Done</a>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/keybinds.js"></script>
+</body>
+</html>

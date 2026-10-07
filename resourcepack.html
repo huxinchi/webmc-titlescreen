@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Resource Packs</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  .rp-screen {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .rp-header {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    box-sizing: border-box;
+  }
+
+  .rp-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .rp-drag-info {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    color: #AAAAAA;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .rp-search-wrap .mc-input {
+    width: 200px;
+    height: 15px;
+    font-size: var(--font-size, 10px);
+  }
+
+  .rp-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    padding: 4px 0;
+    box-sizing: border-box;
+  }
+
+  .rp-col {
+    width: 200px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .rp-col-title {
+    flex: 0 0 auto;
+    text-align: center;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    font-weight: bold;
+    text-decoration: underline;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    padding: 2px 0 4px;
+    user-select: none;
+  }
+
+  .rp-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-image: url('assets/background/menu_list_background.png');
+    background-repeat: repeat;
+    background-size: 32px 32px;
+    image-rendering: pixelated;
+    padding: 2px;
+    box-sizing: border-box;
+  }
+
+  .rp-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 2px;
+    box-sizing: border-box;
+    cursor: pointer;
+    user-select: none;
+    border: 1px solid transparent;
+    min-height: 36px;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .rp-entry:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .rp-entry.selected {
+    background-color: rgba(255, 255, 255, 0.16);
+    border-color: #ffffff;
+  }
+
+  /* 不兼容包：整行背景填充（源码 -8978432 = 0xFF770000） */
+  .rp-entry.rp-incompatible {
+    background-color: #770000;
+  }
+  .rp-entry.rp-incompatible:hover {
+    background-color: rgba(119, 0, 0, 0.85);
+  }
+  .rp-entry.rp-incompatible.selected {
+    background-color: rgba(119, 0, 0, 0.9);
+    border-color: #ffffff;
+  }
+
+  .rp-icon {
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    image-rendering: pixelated;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 100% 100%;
+  }
+
+  .rp-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding-top: 1px;
+  }
+
+  .rp-name {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+    max-width: 157px;
+  }
+
+  .rp-desc {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    color: #808080;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    line-height: 1.2;
+    max-width: 157px;
+    margin-top: 2px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .rp-footer {
+    flex: 0 0 33px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+  }
+
+
+</style>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rp-screen">
+
+  <div class="rp-header">
+    <div class="rp-title" data-i18n="resourcePack.title">Resource Packs</div>
+    <div class="rp-drag-info" data-i18n="pack.dropInfo">Drag and drop your packs here</div>
+    <div class="rp-search-wrap">
+      <input class="mc-input" id="rp-search" type="text"
+             data-i18n-placeholder="gui.packSelection.search" placeholder="Search...">
+    </div>
+  </div>
+
+  <div class="rp-content">
+    <div class="rp-col">
+      <div class="rp-col-title" data-i18n="pack.available.title">Available</div>
+      <div class="rp-list mc-scroll" id="rp-available"></div>
+    </div>
+    <div class="rp-col">
+      <div class="rp-col-title" data-i18n="pack.selected.title">Selected</div>
+      <div class="rp-list mc-scroll" id="rp-selected"></div>
+    </div>
+  </div>
+
+  <div class="rp-footer">
+    <button class="mcbtn mcbtn-150" id="rp-open-folder" data-i18n="pack.openFolder">Open Pack Folder</button>
+    <a class="mcbtn mcbtn-150 btn-back" id="rp-done" href="options.html" data-i18n="gui.done">Done</a>
+  </div>
+
+</div>
+
+<script src="js/main.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  var SPRITE_DIR   = 'assets/transferable_list/';
+  var DEFAULT_ICON = 'assets/icon/unknown_pack.png';
+  var TINT_CSS     = 'linear-gradient(rgba(144,144,144,0.63), rgba(144,144,144,0.63))';
+
+  var availEl   = document.getElementById('rp-available');
+  var selEl     = document.getElementById('rp-selected');
+  var searchEl  = document.getElementById('rp-search');
+  var folderBtn = document.getElementById('rp-open-folder');
+  var doneBtn   = document.getElementById('rp-done');
+
+  var allIds          = [];
+  var selectedIds     = [];
+  var selectedSet     = {};
+  var currentSelected = null;
+  var focusedList     = null;
+
+  var lastTouchUpAt = 0;
+
+  var lastPointerType = 'mouse';
+  document.addEventListener('pointerdown', function(e) {
+    lastPointerType = e.pointerType || 'mouse';
+  }, true);
+
+  var touchActiveClear = null;
+  var lastActive = null;
+
+  function t(key) {
+    return (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+  }
+  function spriteUrl(name) {
+    return 'url("' + SPRITE_DIR + name + '.png")';
+  }
+
+  function refreshSet() {
+    selectedSet = {};
+    selectedIds.forEach(function(id) { selectedSet[id] = true; });
+  }
+
+  function findIndexEntry(id) {
+    var idx = window.mcResourcePacks.getIndex();
+    for (var i = 0; i < idx.length; i++) {
+      if (idx[i].id === id) return idx[i];
+    }
+    return null;
+  }
+  function getPack(id) { return window.mcResourcePacks.getPack(id); }
+
+  function isRequired(id) {
+    var p = getPack(id), e = findIndexEntry(id);
+    return !!((p && p.required) || (e && e.required));
+  }
+  function isFixedPosition(id) {
+    var p = getPack(id), e = findIndexEntry(id);
+    return !!((p && p.fixedPosition) || (e && e.fixedPosition));
+  }
+
+  function canSelect(id)   { return !selectedSet[id]; }
+  function canUnselect(id) { return selectedSet[id] && !isRequired(id); }
+  function canMoveUp(id)   { return selectedIds.indexOf(id) > 0; }
+  function canMoveDown(id) {
+    var i = selectedIds.indexOf(id);
+    return i >= 0 && i < selectedIds.length - 1;
+  }
+
+  function currentFilter() {
+    return (searchEl.value || '').trim().toLowerCase();
+  }
+  function matchesFilter(id) {
+    var q = currentFilter();
+    if (!q) return true;
+    var pack = getPack(id);
+    if (!pack) return false;
+    var hay = ((pack.title || '') + ' ' + (pack.description || '') + ' ' + id).toLowerCase();
+    return hay.indexOf(q) >= 0;
+  }
+
+  function getVisibleIds(listType) {
+    if (listType === 'available') {
+      return allIds.filter(function(id) {
+        return !selectedSet[id] && matchesFilter(id);
+      });
+    }
+    if (listType === 'selected') {
+      return selectedIds.filter(matchesFilter);
+    }
+    return [];
+  }
+
+  /* ==========================================================
+     图标绘制
+     ========================================================== */
+  function paintIcon(iconEl, iconBgs, sprites, showTint) {
+    var images = [];
+    if (typeof sprites === 'string' && sprites) {
+      images.push(spriteUrl(sprites));
+    } else if (Array.isArray(sprites) && sprites.length > 0) {
+      for (var i = 0; i < sprites.length; i++) {
+        images.push(spriteUrl(sprites[i]));
+      }
+    }
+    if (showTint) images.push(TINT_CSS);
+
+    if (Array.isArray(iconBgs)) {
+      for (var j = 0; j < iconBgs.length; j++) images.push(iconBgs[j]);
+    } else if (iconBgs) {
+      images.push(iconBgs);
+    }
+
+    var n = images.length;
+    var sizes = [], positions = [], repeats = [];
+    for (var k = 0; k < n; k++) {
+      sizes.push('100% 100%');
+      positions.push('center');
+      repeats.push('no-repeat');
+    }
+
+    iconEl.style.backgroundImage    = images.join(', ');
+    iconEl.style.backgroundSize     = sizes.join(', ');
+    iconEl.style.backgroundPosition = positions.join(', ');
+    iconEl.style.backgroundRepeat   = repeats.join(', ');
+  }
+
+  function computeSprites(id, listType, overlayEnabled, nx, ny) {
+    if (!overlayEnabled) return null;
+    var inIcon = nx >= 0 && nx < 32 && ny >= 0 && ny < 32;
+
+    if (listType === 'available') {
+      if (canSelect(id)) return inIcon ? 'select_highlighted' : 'select';
+      return null;
+    }
+
+    var list = [];
+    if (canUnselect(id)) {
+      var leftHalf = inIcon && nx < 16;
+      list.push(leftHalf ? 'unselect_highlighted' : 'unselect');
+    }
+    if (canMoveUp(id)) {
+      var topRight = inIcon && nx >= 16 && ny < 16;
+      list.push(topRight ? 'move_up_highlighted' : 'move_up');
+    }
+    if (canMoveDown(id)) {
+      var bottomRight = inIcon && nx >= 16 && ny >= 16;
+      list.push(bottomRight ? 'move_down_highlighted' : 'move_down');
+    }
+    return list.length > 0 ? list : null;
+  }
+
+  function setCurrentSelected(id, listType) {
+    if (currentSelected === id && focusedList === listType) return;
+    currentSelected = id;
+    focusedList = listType;
+    render();
+  }
+
+  function restoreActiveOverlay() {
+    if (!lastActive) return;
+    if (lastActive.source !== 'touch') return;
+
+    var container = (lastActive.listType === 'available') ? availEl : selEl;
+    var el = container.querySelector('.rp-entry[data-id="' + lastActive.id + '"]');
+    if (!el) return;
+    var iconEl = el.querySelector('.rp-icon');
+    if (!iconEl) return;
+
+    var iconBgs = [];
+    try { iconBgs = JSON.parse(el.dataset.iconBgs || '[]'); } catch (e) {}
+    var overlayEnabled = el.dataset.overlayEnabled === '1';
+    var sprites = computeSprites(lastActive.id, lastActive.listType, overlayEnabled,
+                                 lastActive.nx, lastActive.ny);
+    paintIcon(iconEl, iconBgs, sprites, true);
+
+    /* 不兼容包：悬停时恢复"名字换 Incompatible、描述换原因"的状态 */
+    var pack = getPack(lastActive.id);
+    if (pack && pack.compatibility && pack.compatibility !== 'compatible') {
+      var nameEl = el.querySelector('.rp-name');
+      var descEl = el.querySelector('.rp-desc');
+      if (nameEl) nameEl.textContent = t('pack.incompatible');
+      if (descEl) descEl.textContent = t('pack.incompatible.' + pack.compatibility);
+    }
+
+    touchActiveClear = function() {
+      paintIcon(iconEl, iconBgs, null, false);
+    };
+  }
+
+  function render() {
+    if (!window.mcResourcePacks) return;
+
+    var availScroll = availEl.scrollTop;
+    var selScroll   = selEl.scrollTop;
+
+    var availIds = allIds.filter(function(id) {
+      return !selectedSet[id] && matchesFilter(id);
+    });
+    var selIds = selectedIds.filter(matchesFilter);
+
+    renderList(availEl, availIds, false);
+    renderList(selEl,   selIds,   true);
+
+    availEl.scrollTop = availScroll;
+    selEl.scrollTop   = selScroll;
+
+    touchActiveClear = null;
+    restoreActiveOverlay();
+  }
+
+  function renderList(container, ids, isSelectedList) {
+    container.innerHTML = '';
+
+    if (ids.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'rp-entry';
+      empty.style.opacity = '0.5';
+      empty.style.cursor = 'default';
+      empty.textContent = '...';
+      container.appendChild(empty);
+      return;
+    }
+
+    ids.forEach(function(id) {
+      container.appendChild(makeEntry(id, isSelectedList));
+    });
+  }
+
+  /* ==========================================================
+     单条目
+     ========================================================== */
+  function makeEntry(id, isSelectedList) {
+    var pack   = getPack(id);
+    var compat = (pack && pack.compatibility) || 'compatible';
+    var isIncompat = (compat !== 'compatible');
+    var overlayEnabled = !(isFixedPosition(id) && isRequired(id));
+    var listType = isSelectedList ? 'selected' : 'available';
+
+    var iconBgs = [];
+    if (pack && pack.icon) iconBgs.push('url("' + pack.icon + '")');
+    iconBgs.push('url("assets/resourcepacks/' + id + '-pack.png")');
+    iconBgs.push('url("' + DEFAULT_ICON + '")');
+
+    var el = document.createElement('div');
+    el.className = 'rp-entry';
+    el.dataset.id = id;
+    el.dataset.iconBgs = JSON.stringify(iconBgs);
+    el.dataset.overlayEnabled = overlayEnabled ? '1' : '0';
+    if (currentSelected === id && focusedList === listType) el.classList.add('selected');
+    if (isIncompat) el.classList.add('rp-incompatible');
+
+    var iconEl = document.createElement('div');
+    iconEl.className = 'rp-icon';
+    el.appendChild(iconEl);
+
+    var info = document.createElement('div');
+    info.className = 'rp-info';
+
+    /* 名字：优先 i18n key */
+    var titleText;
+    if (pack && pack.titleKey) {
+      var tv = t(pack.titleKey);
+      titleText = (tv === pack.titleKey) ? ((pack && pack.title) || id) : tv;
+    } else {
+      titleText = (pack && pack.title) || id;
+    }
+
+    /* 描述：优先 i18n key */
+    var descText;
+    if (pack && pack.descriptionKey) {
+      var dv = t(pack.descriptionKey);
+      descText = (dv === pack.descriptionKey) ? ((pack && pack.description) || '') : dv;
+    } else {
+      descText = (pack && pack.description) || '';
+    }
+
+    var name = document.createElement('div');
+    name.className = 'rp-name';
+    name.textContent = titleText;
+
+    var desc = document.createElement('div');
+    desc.className = 'rp-desc';
+    desc.textContent = descText;
+
+    /* 保存原始文本，供悬停替换后恢复 */
+    var origNameText = titleText;
+    var origDescText = descText;
+
+    info.appendChild(name);
+    info.appendChild(desc);
+    el.appendChild(info);
+
+    paintIcon(iconEl, iconBgs, null, false);
+
+    function relToIcon(clientX, clientY) {
+      var r = iconEl.getBoundingClientRect();
+      if (!r.width || !r.height) return { x: -1, y: -1, in: false };
+      var nx = (clientX - r.left) / r.width  * 32;
+      var ny = (clientY - r.top ) / r.height * 32;
+      var inIcon = nx >= 0 && nx < 32 && ny >= 0 && ny < 32;
+      return { x: nx, y: ny, in: inIcon };
+    }
+
+    /* 源码 PackEntry.extractContent 里：
+       悬停不兼容包时名字换 pack.incompatible、描述换 pack.incompatibility.<type> */
+    function applyIncompatText() {
+      if (!isIncompat) return;
+      var inc = t('pack.incompatible');
+      name.textContent = (inc === 'pack.incompatible') ? 'Incompatible' : inc;
+      var reasonKey = 'pack.incompatible.' + compat;
+      var reason = t(reasonKey);
+      desc.textContent = (reason === reasonKey) ? compat : reason;
+    }
+
+    function restoreOriginalText() {
+      name.textContent = origNameText;
+      desc.textContent = origDescText;
+    }
+
+    function activateAt(clientX, clientY, source) {
+      var pos = relToIcon(clientX, clientY);
+      var sprites = computeSprites(id, listType, overlayEnabled, pos.x, pos.y);
+      paintIcon(iconEl, iconBgs, sprites, true);
+      applyIncompatText();
+      lastActive = {
+        id: id, listType: listType,
+        nx: pos.x, ny: pos.y,
+        source: source || 'mouse'
+      };
+    }
+
+    function clearOverlay() {
+      paintIcon(iconEl, iconBgs, null, false);
+      restoreOriginalText();
+      if (lastActive && lastActive.id === id && lastActive.listType === listType) {
+        lastActive = null;
+      }
+      if (touchActiveClear === clearOverlay) {
+        touchActiveClear = null;
+      }
+    }
+
+    el.addEventListener('mouseenter', function(e) {
+      if (lastPointerType === 'touch') return;
+      activateAt(e.clientX, e.clientY, 'mouse');
+    });
+    el.addEventListener('mousemove', function(e) {
+      if (lastPointerType === 'touch') return;
+      activateAt(e.clientX, e.clientY, 'mouse');
+    });
+    el.addEventListener('mouseleave', clearOverlay);
+
+    el.addEventListener('pointerdown', function(e) {
+      if (e.pointerType !== 'touch') return;
+      try { searchEl.blur(); } catch (err) {}
+      if (touchActiveClear && touchActiveClear !== clearOverlay) {
+        touchActiveClear();
+      }
+      touchActiveClear = clearOverlay;
+      activateAt(e.clientX, e.clientY, 'touch');
+    });
+    el.addEventListener('pointermove', function(e) {
+      if (e.pointerType !== 'touch') return;
+      if (touchActiveClear && touchActiveClear !== clearOverlay) {
+        touchActiveClear();
+        touchActiveClear = clearOverlay;
+      } else {
+        touchActiveClear = clearOverlay;
+      }
+      activateAt(e.clientX, e.clientY, 'touch');
+    });
+
+    el.addEventListener('pointerup', function(e) {
+      if (e.pointerType !== 'touch') return;
+      lastTouchUpAt = Date.now();
+      var pos = relToIcon(e.clientX, e.clientY);
+      handleClick(pos, isSelectedList);
+    });
+    el.addEventListener('pointercancel', clearOverlay);
+
+    el.addEventListener('mousedown', function(e) {
+      if (e.pointerType === 'touch') return;
+      try { searchEl.blur(); } catch (err) {}
+    });
+
+    el.addEventListener('click', function(e) {
+      if (Date.now() - lastTouchUpAt < 800) return;
+      var pos = relToIcon(e.clientX, e.clientY);
+      handleClick(pos, isSelectedList);
+    });
+
+    function handleClick(pos, isSelected) {
+      if (!overlayEnabled) {
+        setCurrentSelected(id, listType);
+        return;
+      }
+
+      if (!isSelected) {
+        if (pos.in && canSelect(id)) {
+          if (isIncompat) confirmIncompat(id, function() { selectPack(id); });
+          else selectPack(id);
+          return;
+        }
+        setCurrentSelected(id, listType);
+        return;
+      }
+
+      if (pos.in) {
+        if (pos.x < 16 && canUnselect(id)) { unselectPack(id); return; }
+        if (pos.x >= 16 && pos.y < 16 && canMoveUp(id)) { moveUp(id); return; }
+        if (pos.x >= 16 && pos.y >= 16 && canMoveDown(id)) { moveDown(id); return; }
+      }
+
+      setCurrentSelected(id, listType);
+    }
+
+    return el;
+  }
+
+  /* 不兼容包点击前的确认（简化版：用 confirm） */
+  function confirmIncompat(id, onConfirm) {
+    var pack = getPack(id);
+    var reasonKey = 'pack.incompatible.' + (pack.compatibility || 'unknown');
+    var reason = t(reasonKey);
+    if (reason === reasonKey) reason = 'This pack is not compatible with this version.';
+    if (window.confirm(reason + '\n\nAdd anyway?')) onConfirm();
+  }
+
+  function selectPack(id) {
+    if (selectedSet[id]) return;
+    selectedIds.unshift(id);
+    refreshSet();
+    currentSelected = id;
+    focusedList = 'selected';
+    if (lastActive && lastActive.id === id) lastActive.listType = 'selected';
+    render();
+  }
+
+  function unselectPack(id) {
+    if (!canUnselect(id)) return;
+    selectedIds = selectedIds.filter(function(x) { return x !== id; });
+    refreshSet();
+    currentSelected = id;
+    focusedList = 'available';
+    if (lastActive && lastActive.id === id) lastActive.listType = 'available';
+    render();
+  }
+
+  function moveUp(id) {
+    var i = selectedIds.indexOf(id);
+    if (i <= 0) return;
+    var tmp = selectedIds[i - 1];
+    selectedIds[i - 1] = selectedIds[i];
+    selectedIds[i] = tmp;
+    render();
+  }
+
+  function moveDown(id) {
+    var i = selectedIds.indexOf(id);
+    if (i < 0 || i >= selectedIds.length - 1) return;
+    var tmp = selectedIds[i + 1];
+    selectedIds[i + 1] = selectedIds[i];
+    selectedIds[i] = tmp;
+    render();
+  }
+
+  searchEl.addEventListener('input', render);
+
+  /* ==========================================================
+     键盘导航（对齐源码 PackEntry.keyPressed）
+     - Enter / Space       → keyboardSelection
+     - Shift + ↑ / ↓       → 在 Selected 列表内移动该包
+     - ↑ / ↓（无 Shift）   → 当前列内移动选中项
+     无 ← / → 切列（源码没有）
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    var key = e.key;
+    var inSearch = (document.activeElement === searchEl);
+
+    /* 搜索框里：只拦 ↑/↓/Enter（失焦进列表导航），其余放行 */
+    if (inSearch) {
+      if (key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'Enter') return;
+      e.preventDefault();
+      try { searchEl.blur(); } catch (err) {}
+    } else {
+      if (key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'Enter' && key !== ' ') return;
+      e.preventDefault();
+    }
+
+    if (!focusedList) {
+      if (getVisibleIds('available').length > 0) focusedList = 'available';
+      else if (getVisibleIds('selected').length > 0) focusedList = 'selected';
+      else return;
+    }
+
+    /* Shift+↑/↓：在 Selected 列表里上下移动该包 */
+    if (e.shiftKey && (key === 'ArrowUp' || key === 'ArrowDown')) {
+      if (focusedList !== 'selected') return;
+      var selIds = getVisibleIds('selected');
+      if (selIds.indexOf(currentSelected) < 0) return;
+      if (key === 'ArrowUp' && canMoveUp(currentSelected)) moveUp(currentSelected);
+      else if (key === 'ArrowDown' && canMoveDown(currentSelected)) moveDown(currentSelected);
+      return;
+    }
+
+    /* ↑/↓：当前列内移动选中项 */
+    if (key === 'ArrowUp' || key === 'ArrowDown') {
+      var ids = getVisibleIds(focusedList);
+      if (ids.length === 0) return;
+      var idx = ids.indexOf(currentSelected);
+      if (idx < 0) idx = 0;
+      else idx += (key === 'ArrowUp' ? -1 : 1);
+      if (idx < 0) idx = 0;
+      if (idx >= ids.length) idx = ids.length - 1;
+      setCurrentSelected(ids[idx], focusedList);
+      return;
+    }
+
+    /* Enter / Space：keyboardSelection */
+    var ids2 = getVisibleIds(focusedList);
+    if (ids2.length === 0) return;
+
+    var targetId = currentSelected;
+    if (ids2.indexOf(targetId) < 0) {
+      setCurrentSelected(ids2[0], focusedList);
+      return;
+    }
+
+    if (focusedList === 'available' && canSelect(targetId)) {
+      var pack = getPack(targetId);
+      if (pack && pack.compatibility && pack.compatibility !== 'compatible') {
+        confirmIncompat(targetId, function() { selectPack(targetId); });
+      } else {
+        selectPack(targetId);
+      }
+    } else if (focusedList === 'selected' && canUnselect(targetId)) {
+      unselectPack(targetId);
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  function boot() {
+    var RP = window.mcResourcePacks;
+    if (!RP) return;
+
+    RP.ready.then(function() {
+      allIds = RP.getIndex().map(function(e) { return e.id; });
+      selectedIds = RP.getSelected().filter(function(id) {
+        return allIds.indexOf(id) >= 0;
+      });
+      refreshSet();
+      render();   /* 先用 fallback 渲染 */
+
+      /* 加载所有 js（不 apply），保证 available 里也能读到 title/description/icon */
+      return RP.loadAll().then(function() {
+        render();   /* 再渲染，数据到位 */
+      });
+    }).then(function() {
+      try { searchEl.focus(); } catch (e) {}
+    });
+  }
+
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(boot);
+  } else {
+    boot();
+  }
+
+  if (doneBtn) {
+    doneBtn.addEventListener('click', function() {
+      try { window.mcResourcePacks.setSelected(selectedIds.slice()); } catch (e) {}
+    });
+  }
+
+  folderBtn.addEventListener('click', function() {
+    alert('Web edition: folder opening is not available.');
+  });
+})();
+</script>
+
+</body>
+</html>

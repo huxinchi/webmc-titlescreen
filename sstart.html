@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Select World</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="image" href="assets/icon/world_selection/unknown_server.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<script src="js/font.js"></script>
+<link rel="stylesheet" href="css/pano.css">
+<link rel="stylesheet" href="css/world_select.css">
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body { color: #fff; font-family: 'Minecraft', monospace; -webkit-font-smoothing: none; font-smooth: never; position: relative; }
+
+  .world-screen {
+    position: fixed; top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex; flex-direction: column; z-index: 1; overflow: hidden;
+  }
+  .world-header { flex: 0 0 49px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; box-sizing: border-box; }
+  .world-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1; color: #ffffff; text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap; user-select: none;
+  }
+  .world-search-wrap { display: flex; justify-content: center; }
+  .world-search-wrap .mc-input { width: 200px; height: 20px; }
+  .world-content {
+    flex: 1 1 auto; min-height: 0;
+    background-image: url('assets/background/menu_list_background.png');
+    background-repeat: repeat; background-size: 32px 32px;
+    image-rendering: pixelated;
+  }
+  .world-footer {
+    flex: 0 0 60px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px; box-sizing: border-box;
+  }
+  .footer-row { display: flex; gap: 8px; justify-content: center; }
+
+</style>
+
+
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="world-screen">
+
+  <div class="world-header">
+    <div class="world-title" data-i18n="selectWorld.title">Select World</div>
+    <div class="world-search-wrap">
+      <input class="mc-input search-hint" id="world-search" type="text"
+             data-i18n-placeholder="gui.selectWorld.search" placeholder="Search...">
+    </div>
+  </div>
+
+  <div class="world-content mc-scroll mc-list" id="world-list"></div>
+
+  <div class="world-footer">
+    <div class="footer-row">
+      <button class="mcbtn mcbtn-150" id="btn-play"     disabled data-i18n="selectWorld.select">Play Selected World</button>
+      <button class="mcbtn mcbtn-150" id="btn-create"              data-i18n="selectWorld.create">Create New World</button>
+    </div>
+    <div class="footer-row">
+      <button class="mcbtn mcbtn-71" id="btn-edit"     disabled data-i18n="selectWorld.edit">Edit</button>
+      <button class="mcbtn mcbtn-71" id="btn-delete"   disabled data-i18n="selectWorld.delete">Delete</button>
+      <button class="mcbtn mcbtn-71" id="btn-recreate" disabled data-i18n="selectWorld.recreate">Recreate</button>
+      <a class="mcbtn mcbtn-71 btn-back" id="btn-back" href="index.html" data-i18n="gui.back">Back</a>
+    </div>
+  </div>
+
+</div>
+
+<script src="js/show_background.js"></script>
+<script src="js/main.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var STORAGE_KEY = 'mc_worlds';
+  var FN_KEY      = '__fn__';
+  var DEFAULT_ICON = 'assets/icon/world_selection/unknown_server.png';
+
+  /* ==========================================================
+     初始世界列表
+     ========================================================== */
+  var DEFAULT_WORLDS = [
+    {
+      name:       'Test World',
+      folder:     'Test_World',
+      lastPlayed: '2026/10/06 12:00',
+      info:       'Survival Mode',
+      icon:       null,
+      join:       'join',
+      alert:      '',
+
+      /* 每次数据刷新时调用（本次是 boot 时一次） */
+      onUpdate: function() {
+        var d = new Date();
+        var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+        this.lastPlayed = d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate())
+          + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+      },
+
+      onJoin:     function() { alert('操作 testserver'); },
+      onEdit:     function() { alert('操作 testserver'); },
+      onDelete:   function() { alert('操作 testserver'); },
+      onRecreate: function() { alert('操作 testserver'); }
+    }
+  ];
+
+  /* 序列化 / 反序列化 */
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {};
+        out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) { console.warn('[world] revive fn failed:', k, e); }
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadWorlds() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var arr = JSON.parse(raw);
+        if (Array.isArray(arr)) return deserialize(arr);
+      }
+    } catch (e) {}
+    var copy = JSON.parse(JSON.stringify(DEFAULT_WORLDS));
+    saveWorlds(copy);
+    return DEFAULT_WORLDS.slice();
+  }
+
+  function saveWorlds(list) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(list)));
+    } catch (e) {}
+  }
+
+  var WORLDS = loadWorlds();
+
+  var listEl      = document.getElementById('world-list');
+  var searchBox   = document.getElementById('world-search');
+  var btnPlay     = document.getElementById('btn-play');
+  var btnEdit     = document.getElementById('btn-edit');
+  var btnDelete   = document.getElementById('btn-delete');
+  var btnRecreate = document.getElementById('btn-recreate');
+  var btnCreate   = document.getElementById('btn-create');
+
+  var selected = null;
+
+  function callHandle(world, name) {
+    if (!world) return;
+    var fn = world[name];
+    if (typeof fn === 'function') {
+      try { fn.call(world); } catch (e) { console.error('[world]', name, e); }
+    }
+  }
+
+  function updateButtonState(world) {
+    selected = world || null;
+    var isError = selected && selected.alert === 'error';
+    btnPlay.disabled     = !selected || isError;
+    btnEdit.disabled     = !selected;
+    btnDelete.disabled   = !selected;
+    btnRecreate.disabled = !selected || isError;
+  }
+
+  function createEntry(world) {
+    var el = document.createElement('div');
+    el.className = 'mc-list-entry world-entry';
+    el._data = world;
+
+    var iconWrap = document.createElement('div');
+    iconWrap.className = 'world-icon-wrap';
+
+    var iconEl = document.createElement('div');
+    iconEl.className = 'world-icon';
+    iconEl.style.backgroundImage =
+      'url("' + String(world.icon || DEFAULT_ICON).replace(/"/g, '\\"') + '")';
+    iconWrap.appendChild(iconEl);
+
+    var statusEl = document.createElement('div');
+    statusEl.className = 'world-status';
+
+    var joinEl = document.createElement('div');
+    joinEl.className = 'world-join';
+    if (world.join) joinEl.dataset.join = world.join;
+
+    joinEl.addEventListener('click', function(e) {
+      e.stopPropagation();
+      setSelected(el);
+      if (world.alert === 'error') return;
+      callHandle(world, 'onJoin');
+    });
+
+    var alertEl = document.createElement('div');
+    alertEl.className = 'world-alert';
+    if (world.alert) alertEl.dataset.alert = world.alert;
+
+    alertEl.addEventListener('mouseenter', function() {
+      if (world.alert === 'error') return;
+      if (!world.join) return;
+      var hi = (world.join === 'marked_join')
+        ? 'assets/icon/world_selection/marked_join_highlighted.png'
+        : 'assets/icon/world_selection/join_highlighted.png';
+      joinEl.style.backgroundImage = 'url("' + hi + '")';
+    });
+    alertEl.addEventListener('mouseleave', function() {
+      joinEl.style.backgroundImage = '';
+    });
+
+    alertEl.addEventListener('click', function(e) {
+      e.stopPropagation();
+      setSelected(el);
+      callHandle(world, 'onAlertClick');
+      if (world.alert === 'error') return;
+      callHandle(world, 'onJoin');
+    });
+
+    statusEl.appendChild(joinEl);
+    statusEl.appendChild(alertEl);
+    iconWrap.appendChild(statusEl);
+
+    var infoEl = document.createElement('div');
+    infoEl.className = 'world-info';
+
+    var nameEl = document.createElement('div');
+    nameEl.className = 'world-name';
+    nameEl.textContent = world.name || '';
+
+    var metaEl = document.createElement('div');
+    metaEl.className = 'world-meta';
+    var metaText = world.folder || world.name || '';
+    if (world.lastPlayed) metaText += ' (' + world.lastPlayed + ')';
+    metaEl.textContent = metaText;
+
+    var infoTextEl = document.createElement('div');
+    infoTextEl.className = 'world-info-text';
+    infoTextEl.textContent = world.info || '';
+
+    infoEl.appendChild(nameEl);
+    infoEl.appendChild(metaEl);
+    infoEl.appendChild(infoTextEl);
+
+    el.appendChild(iconWrap);
+    el.appendChild(infoEl);
+
+    el.addEventListener('click', function() { setSelected(el); });
+    el.addEventListener('dblclick', function() {
+      setSelected(el);
+      if (world.alert === 'error') return;
+      callHandle(world, 'onJoin');
+    });
+
+    world._el = el;
+    return el;
+  }
+
+  function renderList(worlds) {
+    listEl.innerHTML = '';
+    for (var i = 0; i < worlds.length; i++) {
+      listEl.appendChild(createEntry(worlds[i]));
+    }
+    setSelected(null);
+  }
+
+  /* 刷新：遍历 onUpdate 后重建列表 */
+  function refreshWorlds() {
+    WORLDS.forEach(function(w) {
+      if (typeof w.onUpdate === 'function') {
+        try { w.onUpdate.call(w); } catch (e) { console.error('[world] onUpdate', e); }
+      }
+    });
+    renderList(WORLDS);
+  }
+
+  function setSelected(el) {
+    var world = el ? el._data : null;
+
+    var all = listEl.querySelectorAll('.world-entry');
+    for (var i = 0; i < all.length; i++) {
+      all[i].classList.toggle('selected', all[i] === el);
+    }
+    updateButtonState(world);
+
+    if (el) {
+      var elRect = listEl.getBoundingClientRect();
+      var entryRect = el.getBoundingClientRect();
+      var currentScroll = listEl.scrollTop;
+      var entryTopInContent = entryRect.top - elRect.top + currentScroll;
+      var target = entryTopInContent + entryRect.height / 2 - listEl.clientHeight / 2;
+      listEl.scrollTop = Math.max(0, target);
+    }
+  }
+
+  function applyFilter(q) {
+    q = (q || '').trim().toLowerCase();
+    var all = listEl.querySelectorAll('.world-entry');
+    for (var i = 0; i < all.length; i++) {
+      var w = all[i]._data;
+      if (!w) continue;
+      var name   = (w.name   || '').toLowerCase();
+      var folder = (w.folder || '').toLowerCase();
+      var hit = !q || name.indexOf(q) >= 0 || folder.indexOf(q) >= 0;
+      all[i].style.display = hit ? '' : 'none';
+    }
+    setSelected(null);
+  }
+
+  btnPlay.addEventListener('click', function() {
+    if (!selected) return;
+    if (selected.alert === 'error') return;
+    callHandle(selected, 'onJoin');
+  });
+
+  btnEdit.addEventListener('click', function() {
+    if (!selected) return;
+    callHandle(selected, 'onEdit');
+  });
+
+  btnDelete.addEventListener('click', function() {
+    if (!selected) return;
+    callHandle(selected, 'onDelete');
+  });
+
+  btnRecreate.addEventListener('click', function() {
+    if (!selected) return;
+    if (selected.alert === 'error') return;
+    callHandle(selected, 'onRecreate');
+  });
+
+  btnCreate.addEventListener('click', function() {
+    console.log('[world] create new');
+  });
+
+  searchBox.addEventListener('input', function() {
+    applyFilter(searchBox.value);
+  });
+
+ 
+
+  window.mcSingleplayer = {
+    getWorlds:  function() { return WORLDS; },
+    saveWorlds: function() { saveWorlds(WORLDS); },
+
+    refreshList: function() { refreshWorlds(); },
+
+    addWorld: function(w) {
+      WORLDS.push(w);
+      saveWorlds(WORLDS);
+      refreshWorlds();
+    },
+
+    removeWorld: function(w) {
+      var idx = WORLDS.indexOf(w);
+      if (idx >= 0) WORLDS.splice(idx, 1);
+      saveWorlds(WORLDS);
+      refreshWorlds();
+    },
+
+    updateWorld: function(w, patch) {
+      if (!w || !patch) return;
+      for (var k in patch) {
+        if (Object.prototype.hasOwnProperty.call(patch, k)) w[k] = patch[k];
+      }
+      saveWorlds(WORLDS);
+      refreshWorlds();
+    }
+  };
+
+  refreshWorlds();
+  searchBox.focus();
+
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(function() {});
+  }
+})();
+</script>
+</body>
+</html>

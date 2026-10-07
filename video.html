@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Video Settings</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+
+<link rel="stylesheet" href="css/options_screen.css">
+<script src="js/font.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="options-screen">
+  <div class="options-header">
+    <div class="options-title" data-i18n="options.videoTitle">Video Settings</div>
+  </div>
+  <div class="options-content mc-scroll" id="opts-list"></div>
+  <div class="options-footer">
+    <a class="mcbtn mcbtn-long btn-back" href="options.html" data-i18n="gui.done">Done</a>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+<script>
+(function() {
+  'use strict';
+  var listEl = document.getElementById('opts-list');
+  if (!listEl || !window.mcWidgets || !window.mcWidgets.OptionsList) return;
+
+  var OPTIONS = {
+    /* ===== Display ===== */
+    'options.framerateLimit':      { type: 'slider', min: 10, max: 260, step: 10, value: 120, format: 'framerate' },
+    'options.vsync':               { type: 'boolean', value: true },
+    'options.inactivityFpsLimit':  { type: 'enum', values: ['minimized','afk'], value: 'afk',
+                                     valueKey: 'options.inactivityFpsLimit.' },
+    'options.guiScale':            { type: 'slider', min: 0, max: 4, step: 1, value: 0, format: 'guiScale' },
+    'options.fullscreen':          { type: 'boolean', value: false },
+    'options.exclusiveFullscreen': { type: 'boolean', value: false },
+    'options.gamma':               { type: 'slider', min: 0, max: 1, step: 0.01, value: 0.5, format: 'gamma' },
+    'options.graphicsApi':         { type: 'enum',
+                                     values: ['default','opengl','vulkan'],
+                                     value: 'default',
+                                     valueKey: 'options.graphicsApi.' },
+
+    /* ===== Quality ===== */
+    'options.graphics.preset':        { type: 'enum',
+                                        values: ['fast','fancy','fabulous','custom'],
+                                        value: 'fancy',
+                                        valueKey: 'options.graphics.' },
+    'options.biomeBlendRadius':       { type: 'slider', min: 0, max: 7, step: 1, value: 2, format: 'biomeBlend' },
+    'options.renderDistance':         { type: 'slider', min: 2, max: 32, step: 1, value: 12, format: 'chunks' },
+    'options.prioritizeChunkUpdates': { type: 'enum',
+                                        values: ['none','player','nearby'],
+                                        value: 'none',
+                                        valueKey: 'options.prioritizeChunkUpdates.' },
+    'options.simulationDistance':     { type: 'slider', min: 5, max: 32, step: 1, value: 12, format: 'chunks' },
+    'options.ao':                     { type: 'boolean', value: true },
+'options.renderClouds': { type: 'enum',
+                          values: ['off','fast','fancy'],
+                          value: 'fancy',
+                          valueKey: 'options.clouds.' },   /* ← 改这里 */
+    'options.particles':              { type: 'enum',
+                                        values: ['all','decreased','minimal'],
+                                        value: 'all',
+                                        valueKey: 'options.particles.' },
+    'options.mipmapLevels':           { type: 'slider', min: 0, max: 4, step: 1, value: 4, format: 'intOrOff' },
+    'options.entityShadows':          { type: 'boolean', value: true },
+    'options.entityDistanceScaling':  { type: 'slider', min: 0.5, max: 5, step: 0.25, value: 1, format: 'percent' },
+    'options.accessibility.menu_background_blurriness': { type: 'slider', min: 0, max: 10, step: 1, value: 5, format: 'intOrOff' },
+    'options.renderCloudsDistance':   { type: 'slider', min: 2, max: 128, step: 2, value: 128, format: 'chunks' },
+    'options.cutoutLeaves':           { type: 'boolean', value: true },
+    'options.improvedTransparency':   { type: 'boolean', value: false },
+    'options.textureFiltering':       { type: 'enum',
+                                        values: ['none','rgss','anisotropic'],
+                                        value: 'none',
+                                        valueKey: 'options.textureFiltering.' },
+    'options.maxAnisotropy':          { type: 'slider', min: 1, max: 3, step: 1, value: 2, format: 'anisotropy' },
+    'options.weatherRadius':          { type: 'slider', min: 3, max: 10, step: 1, value: 10, format: 'blocks' },
+
+    /* ===== Preferences ===== */
+    'options.autosaveIndicator':      { type: 'boolean', value: true },
+    'options.vignette':               { type: 'boolean', value: true },
+'options.attackIndicator': { type: 'enum',
+                             values: ['off','crosshair','hotbar'],
+                             value: 'crosshair',
+                             valueKey: 'options.attack.' },            /* ← 对 */
+    'options.chunkFade':              { type: 'slider', min: 0, max: 2, step: 0.05, value: 0.75, format: 'chunkFade' }
+  };
+
+  var ROWS = [
+    { header: 'options.video.display.header' },
+    ['options.framerateLimit',           'options.vsync'],
+    ['options.inactivityFpsLimit',       'options.guiScale'],
+    ['options.fullscreen',               'options.exclusiveFullscreen'],
+    ['options.gamma',                    'options.graphicsApi'],
+
+    { header: 'options.video.quality.header' },
+    { big:    'options.graphics.preset' },
+    ['options.biomeBlendRadius',         'options.renderDistance'],
+    ['options.prioritizeChunkUpdates',   'options.simulationDistance'],
+    ['options.ao',                       'options.renderClouds'],
+    ['options.particles',                'options.mipmapLevels'],
+    ['options.entityShadows',            'options.entityDistanceScaling'],
+    ['options.accessibility.menu_background_blurriness', 'options.renderCloudsDistance'],
+    ['options.cutoutLeaves',             'options.improvedTransparency'],
+    ['options.textureFiltering',         'options.maxAnisotropy'],
+    ['options.weatherRadius'],
+
+    { header: 'options.video.preferences.header' },
+    ['options.autosaveIndicator',        'options.vignette'],
+    ['options.attackIndicator',          'options.chunkFade']
+  ];
+
+  new window.mcWidgets.OptionsList(listEl, { options: OPTIONS, rows: ROWS });
+})();
+</script>
+</body>
+</html>

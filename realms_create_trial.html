@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Create a realm</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  .trial-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  /* ==========================================================
+     标题 —— width/2, y = 11 居中
+     ========================================================== */
+  .trial-title {
+    position: absolute;
+    top: 11px;
+    left: 0; right: 0;
+    text-align: center;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+  }
+
+  /* ==========================================================
+     表单标签 + 输入框
+     源码：
+       label "Realm name"       x = width/2 - 100, y = 52
+       nameBox                  x = width/2 - 100, y = 65, 200×20
+       label "Realm description" x = width/2 - 100, y = 102
+       descriptionBox           x = width/2 - 100, y = 115, 200×20
+     ========================================================== */
+  .trial-label {
+    position: absolute;
+    left: calc(50% - 100px);
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .trial-label.label-name { top: 52px; }
+  .trial-label.label-desc { top: 102px; }
+
+  .trial-input-wrap {
+    position: absolute;
+    left: calc(50% - 100px);
+    width: 200px;
+    height: 20px;
+  }
+  #trial-name-wrap { top: 65px; }
+  #trial-desc-wrap { top: 115px; }
+
+  .trial-input-wrap .mc-input {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+  }
+
+  /* ==========================================================
+     Footer —— Create (97) + Cancel (95)
+     源码 y = height/4 + 120 + 17（由 JS 计算）
+     ========================================================== */
+  .trial-footer {
+    position: absolute;
+    left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="trial-root">
+
+  <div class="trial-title">Create a realm</div>
+
+  <div class="trial-label label-name">Realm name</div>
+  <div class="trial-input-wrap" id="trial-name-wrap">
+    <input class="mc-input" id="trial-name" type="text" autocomplete="off">
+  </div>
+
+  <div class="trial-label label-desc">Realm description</div>
+  <div class="trial-input-wrap" id="trial-desc-wrap">
+    <input class="mc-input" id="trial-desc" type="text" autocomplete="off">
+  </div>
+
+  <div class="trial-footer" id="trial-footer">
+    <button class="mcbtn mcbtn-half" id="btn-create" disabled>Create</button>
+    <a class="mcbtn mcbtn-half btn-back" id="btn-cancel" href="realms.html">Cancel</a>
+  </div>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var STORAGE_KEY     = 'mc_realms';
+  var STORAGE_VERSION = 3;
+  var VERSION_KEY     = 'mc_realms_version';
+  var FN_KEY          = '__fn__';
+
+  /* ==========================================================
+     Tooltip 硬编码（Realms 无 i18n）
+     ========================================================== */
+  var TXT = {
+    create:      'Create',
+    cancel:      'Cancel',
+    emptyName:   'You must enter a name!'
+  };
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var nameInput = document.getElementById('trial-name');
+  var descInput = document.getElementById('trial-desc');
+  var btnCreate = document.getElementById('btn-create');
+  var footerEl  = document.getElementById('trial-footer');
+  var rootEl    = document.querySelector('.trial-root');
+
+  /* ==========================================================
+     校验：name 非空 → Create 启用
+     ========================================================== */
+  function valid() {
+    return nameInput.value != null && nameInput.value.trim().length > 0;
+  }
+
+  function refreshCreateState() {
+    btnCreate.disabled = !valid();
+  }
+
+  nameInput.addEventListener('input', refreshCreateState);
+  descInput.addEventListener('input', refreshCreateState);
+
+  /* ==========================================================
+     定位 Footer —— 源码 y = height/4 + 120 + 17
+     ========================================================== */
+  function layoutFooter() {
+    var h = rootEl.clientHeight || window.innerHeight;
+    var y = Math.floor(h / 4) + 120 + 17;
+    footerEl.style.top = y + 'px';
+  }
+  layoutFooter();
+  window.addEventListener('resize', layoutFooter);
+
+  /* ==========================================================
+     创建 —— 写一个新 realm 到 localStorage → 跳回 realms.html
+     （源码是 TrialCreationTask + LongRunningMcoTaskScreen）
+     ========================================================== */
+  function createRealm() {
+    if (!valid()) return;
+
+    var name = nameInput.value.trim();
+    var desc = descInput.value.trim();
+
+    /* 读现有数据 */
+    var data = null;
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) data = JSON.parse(raw);
+    } catch (e) {}
+
+    if (!data || typeof data !== 'object') {
+      /* 首次：造一个空壳 */
+      data = {
+        trialAvailable: false,
+        createdTrial: false,
+        hasUnreadNews: false,
+        newsLink: '',
+        pendingInvites: 0,
+        ownUUID: 'self-uuid',
+        servers: []
+      };
+    }
+
+    if (!Array.isArray(data.servers)) data.servers = [];
+
+    var newServer = {
+      id:          'realm_' + Date.now(),
+      name:        name,
+      description: desc,
+      ownerUUID:   data.ownUUID || 'self-uuid',
+      state:       'closed',           /* 新建默认关闭，等用户打开 */
+      expired:     false,
+      daysLeft:    0,
+      players:     { online: 0, max: 10 }
+    };
+
+    data.servers.push(newServer);
+
+    /* 标记已用 trial */
+    data.createdTrial = true;
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {}
+
+    /* trial 标记写到 cookie（供主菜单显示）
+       同时清理创建入口（避免用户再点 Get a trial） */
+    try {
+      document.cookie = 'realms_trial=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+    } catch (e) {}
+
+    /* 跳回 Realms 主页（用 replace，避免返回键回到本页） */
+    location.replace('realms.html');
+  }
+
+  btnCreate.addEventListener('click', function() {
+    createRealm();
+  });
+
+  /* ==========================================================
+     键盘
+     Enter  → Create（如果有效）
+     Esc    → Cancel（交给 .btn-back 处理）
+     Tab    → 在两输入框间切换（浏览器默认已支持）
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!btnCreate.disabled) createRealm();
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (window.mcBack && typeof window.mcBack.back === 'function') {
+        window.mcBack.back('realms.html');
+      } else {
+        location.href = 'realms.html';
+      }
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  refreshCreateState();
+  nameInput.focus();
+
+})();
+</script>
+
+</body>
+</html>

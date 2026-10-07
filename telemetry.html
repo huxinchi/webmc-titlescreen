@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Telemetry Data Collection</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<link rel="stylesheet" href="css/options_screen.css">
+<script src="js/font.js"></script>
+
+<style>
+  /* ============ Header：标题 + 描述 + 隐私/反馈按钮 ============ */
+  .telemetry-header {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 8px 4px;
+    box-sizing: border-box;
+  }
+
+  .telemetry-description {
+    text-align: center;
+    color: #BABABE;
+    font-size: var(--font-size, 10px);
+    line-height: 1.4;
+    max-width: calc(100% - 16px);
+    white-space: pre-line;
+    user-select: none;
+  }
+
+  /* ============ 内容：滚动的事件类型列表 ============ */
+  .telemetry-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 16px 4px;
+    box-sizing: border-box;
+  }
+
+  /* 事件类型标题（居中） */
+  .telemetry-ev-title {
+    text-align: center;
+    color: #ffffff;
+    font-size: var(--font-size, 10px);
+    line-height: 1.4;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    margin-bottom: 4px;
+  }
+
+  /* 事件类型描述（居中、灰） */
+  .telemetry-ev-desc {
+    text-align: center;
+    color: #AAAAAA;
+    font-size: var(--font-size, 10px);
+    line-height: 1.4;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    margin-bottom: 4px;
+  }
+
+  /* "Included Data" 小标题（左对齐、加粗、下划线） */
+  .telemetry-props-title {
+    color: #ffffff;
+    font-size: var(--font-size, 10px);
+    font-weight: bold;
+    text-decoration: underline;
+    line-height: 1.4;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    margin: 4px 0 2px;
+  }
+
+  /* 属性列表 */
+  .telemetry-props {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: #ffffff;
+    font-size: var(--font-size, 10px);
+    line-height: 1.5;
+    text-shadow: 1px 1px 0 #3f3f3f;
+  }
+  .telemetry-props li { display: block; }
+
+  /* 事件类型之间的间距 */
+  .telemetry-spacer { height: 9px; }
+
+  /* 未勾选 opt-in 时，可选事件整体变灰 */
+  .telemetry-disabled {
+    color: #808080 !important;
+    text-shadow: 1px 1px 0 #1a1a1a !important;
+  }
+
+  /* ============ Footer：复选框 + 显示数据/完成按钮 ============ */
+  .telemetry-footer {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px 8px;
+    box-sizing: border-box;
+  }
+
+  .telemetry-optin-row {
+    color: #E0E0E0;
+    font-size: var(--font-size, 10px);
+    text-shadow: 1px 1px 0 #3f3f3f;
+    max-width: calc(100% - 40px);
+  }
+
+  .telemetry-btn-row {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+</style>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="options-screen">
+
+  <div class="telemetry-header">
+    <div class="options-title" data-i18n="telemetry_info.screen.title">Telemetry Data Collection</div>
+    <div class="telemetry-description" data-i18n="telemetry_info.screen.description"></div>
+    <div class="telemetry-btn-row">
+
+ <a class="mcbtn mcbtn-150" id="btn-privacy"
+     href="http://go.microsoft.com/fwlink/?LinkId=521839"
+     target="_blank" rel="noopener"
+     data-i18n="telemetry_info.button.privacy_statement">Privacy Statement</a>
+  <a class="mcbtn mcbtn-150" id="btn-feedback"
+     href="https://aka.ms/javafeedback?ref=game"
+     target="_blank" rel="noopener"
+     data-i18n="telemetry_info.button.give_feedback">Give Feedback</a>
+    </div>
+  </div>
+
+  <div class="telemetry-content mc-scroll" id="telemetry-content"></div>
+
+  <div class="telemetry-footer">
+    <div class="mc-checkbox-row telemetry-optin-row" id="opt-in-row">
+      <div class="mc-checkbox" id="opt-in-check" data-checked="false"></div>
+      <span data-i18n="telemetry_info.opt_in.description">I agree to send optional telemetry data</span>
+    </div>
+    <div class="telemetry-btn-row">
+      <a class="mcbtn mcbtn-150" id="btn-show-data" href="#"
+         data-i18n="telemetry_info.button.show_data">Show My Data</a>
+      <a class="mcbtn mcbtn-150 btn-back" href="options.html"
+         data-i18n="gui.done">Done</a>
+    </div>
+  </div>
+
+</div>
+
+<script src="js/main.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     数据来自 TelemetryEventType.java / TelemetryProperty.java
+     ========================================================== */
+
+  var GLOBAL_PROPS = [
+    'user_id', 'client_id', 'minecraft_session_id',
+    'game_version', 'operating_system', 'platform',
+    'client_modded', 'launcher_name',
+    'event_timestamp_utc', 'opt_in'
+  ];
+
+  var WORLD_SESSION_PROPS = GLOBAL_PROPS.concat([
+    'world_session_id', 'server_modded', 'server_type', 'server_session_id'
+  ]);
+
+  var EVENTS = [
+    {
+      id: 'graphics_capabilities', optIn: false,
+      props: GLOBAL_PROPS.concat([
+        'backend_name', 'backend_failure_message',
+        'backend_failure_reason', 'backend_failure_missing_capabilities'
+      ])
+    },
+    {
+      id: 'world_loaded', optIn: false,
+      props: WORLD_SESSION_PROPS.concat(['game_mode', 'realms_map_content'])
+    },
+    {
+      id: 'world_unloaded', optIn: false,
+      props: WORLD_SESSION_PROPS.concat(['seconds_since_load', 'ticks_since_load'])
+    },
+    {
+      id: 'performance_metrics', optIn: true,
+      props: WORLD_SESSION_PROPS.concat([
+        'frame_rate_samples', 'render_time_samples', 'used_memory_samples',
+        'number_of_samples', 'render_distance', 'dedicated_memory_kb'
+      ])
+    },
+    {
+      id: 'world_load_times', optIn: true,
+      props: WORLD_SESSION_PROPS.concat(['world_load_time_ms', 'new_world'])
+    },
+    {
+      id: 'advancement_made', optIn: true,
+      props: WORLD_SESSION_PROPS.concat(['advancement_id', 'advancement_game_time'])
+    },
+    {
+      id: 'game_load_times', optIn: true,
+      props: GLOBAL_PROPS.concat([
+        'load_time_total_time_ms', 'load_time_pre_window_ms',
+        'load_time_bootstrap_ms', 'load_time_loading_overlay_ms'
+      ])
+    }
+  ];
+
+  /* 源码：按 isOptIn 排序，false 在前 */
+  EVENTS.sort(function(a, b) { return (a.optIn ? 1 : 0) - (b.optIn ? 1 : 0); });
+
+  var contentEl = document.getElementById('telemetry-content');
+  var optInChk  = document.getElementById('opt-in-check');
+
+  function t(key) {
+    return (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+  }
+  function tArgs(key, arg) {
+    var s = t(key);
+    return s.indexOf('%s') >= 0 ? s.replace('%s', arg) : s;
+  }
+
+  function optInValue() {
+    return window.mcOptions
+      ? !!window.mcOptions.get('options.telemetry.button', false)
+      : false;
+  }
+
+  /* ==========================================================
+     渲染内容区（对齐 TelemetryEventWidget.buildContent）
+     ========================================================== */
+  function render() {
+    if (!contentEl) return;
+
+    var hasOptedIn = optInValue();
+    contentEl.innerHTML = '';
+
+    EVENTS.forEach(function(ev, idx) {
+      /* isDisabled = optIn 事件 + 用户没勾选 opt-in */
+      var isDisabled = ev.optIn && !hasOptedIn;
+
+      /* --- 事件标题：required / optional / optional.disabled --- */
+      var titleKey = ev.optIn
+        ? (isDisabled ? 'telemetry.event.optional.disabled'
+                      : 'telemetry.event.optional')
+        : 'telemetry.event.required';
+
+      var titleEl = document.createElement('div');
+      titleEl.className = 'telemetry-ev-title' + (isDisabled ? ' telemetry-disabled' : '');
+      titleEl.textContent = tArgs(titleKey, t('telemetry.event.' + ev.id + '.title'));
+      contentEl.appendChild(titleEl);
+
+      /* --- 事件描述（灰） --- */
+      var descEl = document.createElement('div');
+      descEl.className = 'telemetry-ev-desc' + (isDisabled ? ' telemetry-disabled' : '');
+      descEl.textContent = t('telemetry.event.' + ev.id + '.description');
+      contentEl.appendChild(descEl);
+
+      /* --- "Included Data" 小标题 --- */
+      var propTitle = document.createElement('div');
+      propTitle.className = 'telemetry-props-title' + (isDisabled ? ' telemetry-disabled' : '');
+      propTitle.textContent = t('telemetry_info.property_title');
+      contentEl.appendChild(propTitle);
+
+      /* --- 属性列表 --- */
+      var ul = document.createElement('ul');
+      ul.className = 'telemetry-props' + (isDisabled ? ' telemetry-disabled' : '');
+      ev.props.forEach(function(pid) {
+        var li = document.createElement('li');
+        li.textContent = t('telemetry.property.' + pid + '.title');
+        ul.appendChild(li);
+      });
+      contentEl.appendChild(ul);
+
+      /* --- 事件之间的间距 --- */
+      if (idx < EVENTS.length - 1) {
+        var sp = document.createElement('div');
+        sp.className = 'telemetry-spacer';
+        contentEl.appendChild(sp);
+      }
+    });
+  }
+
+  /* ==========================================================
+     复选框状态同步
+     ========================================================== */
+  function syncCheckbox() {
+    if (optInChk) optInChk.dataset.checked = optInValue() ? 'true' : 'false';
+  }
+
+  document.addEventListener('checkchange', function(e) {
+    if (!e.target || e.target.id !== 'opt-in-check') return;
+    if (window.mcOptions) {
+      window.mcOptions.set('options.telemetry.button', !!e.detail.checked);
+    }
+    /* 源码：onOptInChanged → widget.onOptInChanged(optIn) → buildContent */
+    render();
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  function boot() {
+    syncCheckbox();
+    render();
+  }
+
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(boot);
+  } else {
+    boot();
+  }
+  document.addEventListener('i18n-ready', boot, false);
+})();
+</script>
+
+</body>
+</html>

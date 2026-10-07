@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Pending Invites</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/realms/accept_icon.png">
+<link rel="preload" as="image" href="assets/realms/reject_icon.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  /* ==========================================================
+     根容器
+     ========================================================== */
+  .pending-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  /* ==========================================================
+     标题 —— width/2, y = 12 居中
+     ========================================================== */
+  .pending-title {
+    position: absolute;
+    top: 12px;
+    left: 0; right: 0;
+    text-align: center;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+  }
+
+  /* ==========================================================
+     列表 —— 从 y=32 到 height-40，宽 340 居中
+     ========================================================== */
+  .pending-list-wrap {
+    position: absolute;
+    left: 50%;
+    top: 32px;
+    bottom: 40px;
+    transform: translateX(-50%);
+    width: 340px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  .pending-list {
+    width: 100%;
+  }
+
+  /* 空状态 —— height/2 - 20 居中 */
+  .pending-empty {
+    position: absolute;
+    left: 0; right: 0;
+    top: calc(50% - 20px);
+    text-align: center;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    display: none;
+  }
+  .pending-empty.visible { display: block; }
+
+  /* ==========================================================
+     邀请条目 —— 高 36
+     ========================================================== */
+  .pending-entry {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 36px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    user-select: none;
+  }
+
+  /* 玩家头像 —— 24×24 色块 */
+  .pending-face {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    margin-right: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Minecraft', monospace;
+    font-size: 12px;
+    font-weight: bold;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #000;
+    image-rendering: pixelated;
+    box-sizing: border-box;
+  }
+
+  /* 三行文字区 */
+  .pending-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+  }
+
+  .pending-world-name {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pending-owner,
+  .pending-date {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #6C6C6C;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ==========================================================
+     接受 / 拒绝按钮 —— 18×18
+     accept_icon.png / reject_icon.png 都是 37×18（两帧横排）
+     帧 0 在 0..17，帧 1 在 19..36 → hover 用 -19px
+     ========================================================== */
+  .pending-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .pending-action {
+    width: 18px;
+    height: 18px;
+    background-position: 0 0;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    cursor: pointer;
+  }
+
+  .pending-action.accept {
+    background-image: url('assets/realms/accept_icon.png');
+    background-size: 37px 18px;
+  }
+  .pending-action.accept:hover {
+    background-position: -19px 0;
+  }
+
+  .pending-action.reject {
+    background-image: url('assets/realms/reject_icon.png');
+    background-size: 37px 18px;
+  }
+  .pending-action.reject:hover {
+    background-position: -19px 0;
+  }
+
+  /* ==========================================================
+     Done 按钮 —— width/2 - 75, height - 32, 153×20
+     ========================================================== */
+  .pending-footer {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+  }
+
+  /* ==========================================================
+     Tooltip
+     ========================================================== */
+  .pending-tooltip {
+    position: fixed;
+    z-index: 9999;
+    padding: 3px 5px;
+    background: rgba(0, 0, 0, 0.85);
+    color: #ffffff;
+    font-family: 'Minecraft', monospace;
+    font-size: 10px;
+    line-height: 1.3;
+    white-space: nowrap;
+    pointer-events: none;
+    display: none;
+    box-shadow: 0 0 0 1px #2c2c2c;
+  }
+  .pending-tooltip.visible { display: block; }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="pending-root">
+
+  <div class="pending-title">Pending Invites</div>
+
+  <div class="pending-list-wrap mc-scroll">
+    <div class="pending-list" id="pending-list"></div>
+  </div>
+
+  <div class="pending-empty" id="pending-empty">No pending invites!</div>
+
+  <div class="pending-footer">
+    <a class="mcbtn mcbtn-150 btn-back" href="realms.html">Done</a>
+  </div>
+
+</div>
+
+<div class="pending-tooltip" id="pending-tooltip"></div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var STORAGE_KEY     = 'mc_realms';
+  var STORAGE_VERSION = 4;         /* 对齐 realms.html 的新版本号 */
+  var VERSION_KEY     = 'mc_realms_version';
+  var FN_KEY          = '__fn__';
+
+  /* ==========================================================
+     硬编码文案
+     ========================================================== */
+  var TXT = {
+    title:    'Pending Invites',
+    nopending:'No pending invites!',
+    accept:   'Accept',
+    reject:   'Reject',
+    done:     'Done'
+  };
+
+  /* ==========================================================
+     序列化 / 反序列化（跟 realms.html 一致）
+     ========================================================== */
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) { console.warn('[pending] revive fn failed:', k, e); }
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var obj = JSON.parse(raw);
+        if (obj && typeof obj === 'object') return deserialize(obj);
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function saveData(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data))); } catch (e) {}
+  }
+
+  var DATA = loadData() || { invites: [], pendingInvites: 0 };
+
+  /* 兼容：如果没有 invites 数组，从 pendingInvites 数字推个数造空条目（只用于旧数据迁移） */
+  if (!Array.isArray(DATA.invites)) DATA.invites = [];
+
+  /* ==========================================================
+     Cookie 同步（供主菜单 show_realm.js）
+     ========================================================== */
+  function setCookie(name, value, days) {
+    var d = new Date();
+    d.setTime(d.getTime() + (days || 365) * 86400000);
+    document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/';
+  }
+  function delCookie(name) {
+    document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+  }
+
+  function syncToMainMenu() {
+    DATA.pendingInvites = DATA.invites.length;
+    if (DATA.pendingInvites > 0) {
+      setCookie('realms_invite', '1');
+    } else {
+      /* 只在原 cookie 有值时写成 '0'，否则保持删除 */
+      if (document.cookie.indexOf('realms_invite=') >= 0) {
+        setCookie('realms_invite', '0');
+      }
+    }
+  }
+
+  /* ==========================================================
+     时间显示 —— 对齐 RealmsUtil.convertToAgePresentation
+     ========================================================== */
+  function agePresentation(ms) {
+    var seconds = Math.floor(ms / 1000);
+    if (seconds < 60) return 'Just now';
+
+    var minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return minutes + ' minute' + (minutes > 1 ? 's' : '') + ' ago';
+
+    var hours = Math.floor(minutes / 60);
+    if (hours < 24) return hours + ' hour' + (hours > 1 ? 's' : '') + ' ago';
+
+    var days = Math.floor(hours / 24);
+    if (days < 30) return days + ' day' + (days > 1 ? 's' : '') + ' ago';
+
+    var months = Math.floor(days / 30);
+    if (months < 12) return months + ' month' + (months > 1 ? 's' : '') + ' ago';
+
+    var years = Math.floor(days / 365);
+    return years + ' year' + (years > 1 ? 's' : '') + ' ago';
+  }
+
+  /* ==========================================================
+     头像色块（无玩家皮肤 API）
+     ========================================================== */
+  function avatarHue(name) {
+    var h = 0;
+    for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+    return Math.abs(h) % 360;
+  }
+
+  function createAvatar(name) {
+    var el = document.createElement('div');
+    el.className = 'pending-face';
+    el.style.background = 'hsl(' + avatarHue(name) + ', 45%, 30%)';
+    el.textContent = (name.charAt(0) || '?').toUpperCase();
+    return el;
+  }
+
+  /* ==========================================================
+     渲染
+     ========================================================== */
+  var listEl  = document.getElementById('pending-list');
+  var emptyEl = document.getElementById('pending-empty');
+  var tooltipEl = document.getElementById('pending-tooltip');
+
+  function render() {
+    listEl.innerHTML = '';
+
+    var invites = DATA.invites || [];
+
+    if (invites.length === 0) {
+      emptyEl.classList.add('visible');
+      return;
+    }
+    emptyEl.classList.remove('visible');
+
+    for (var i = 0; i < invites.length; i++) {
+      listEl.appendChild(renderEntry(invites[i]));
+    }
+  }
+
+  function renderEntry(invite) {
+    var el = document.createElement('div');
+    el.className = 'pending-entry';
+
+    /* 头像 */
+    el.appendChild(createAvatar(invite.worldOwnerName || '?'));
+
+    /* 三行文字 */
+    var infoEl = document.createElement('div');
+    infoEl.className = 'pending-info';
+
+    var nameEl = document.createElement('div');
+    nameEl.className = 'pending-world-name';
+    nameEl.textContent = invite.worldName || '';
+    infoEl.appendChild(nameEl);
+
+    var ownerEl = document.createElement('div');
+    ownerEl.className = 'pending-owner';
+    ownerEl.textContent = invite.worldOwnerName || '';
+    infoEl.appendChild(ownerEl);
+
+    var dateEl = document.createElement('div');
+    dateEl.className = 'pending-date';
+    var sinceMs = Date.now() - (invite.date || Date.now());
+    if (sinceMs < 0) sinceMs = 0;
+    dateEl.textContent = agePresentation(sinceMs);
+    infoEl.appendChild(dateEl);
+
+    el.appendChild(infoEl);
+
+    /* 接受 / 拒绝按钮 */
+    var actionsEl = document.createElement('div');
+    actionsEl.className = 'pending-actions';
+
+    var acceptBtn = document.createElement('div');
+    acceptBtn.className = 'pending-action accept';
+    acceptBtn.title = TXT.accept;
+    acceptBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      fireAccept(invite);
+    });
+    acceptBtn.addEventListener('mouseenter', function() { showTooltip(TXT.accept, e); });
+    acceptBtn.addEventListener('mouseleave', hideTooltip);
+    actionsEl.appendChild(acceptBtn);
+
+    var rejectBtn = document.createElement('div');
+    rejectBtn.className = 'pending-action reject';
+    rejectBtn.title = TXT.reject;
+    rejectBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      fireReject(invite);
+    });
+    rejectBtn.addEventListener('mouseenter', function() { showTooltip(TXT.reject, e); });
+    rejectBtn.addEventListener('mouseleave', hideTooltip);
+    actionsEl.appendChild(rejectBtn);
+
+    el.appendChild(actionsEl);
+
+    return el;
+  }
+
+  /* ==========================================================
+     Handle 分发
+     - 有 onAccept / onReject → 调 handle
+     - 没有 → 默认：从 invites 移除 + 保存 + 重渲染
+     ========================================================== */
+  function fireAccept(invite) {
+    if (typeof invite.onAccept === 'function') {
+      try { invite.onAccept.call(invite); return; }
+      catch (e) { console.error('[pending] onAccept', e); }
+    }
+    defaultRemove(invite);
+  }
+
+  function fireReject(invite) {
+    if (typeof invite.onReject === 'function') {
+      try { invite.onReject.call(invite); return; }
+      catch (e) { console.error('[pending] onReject', e); }
+    }
+    defaultRemove(invite);
+  }
+
+  function defaultRemove(invite) {
+    var i = DATA.invites.indexOf(invite);
+    if (i >= 0) DATA.invites.splice(i, 1);
+    saveData(DATA);
+    syncToMainMenu();
+    render();
+  }
+
+  /* ==========================================================
+     Tooltip
+     ========================================================== */
+  function showTooltip(text, e) {
+    if (!text) return;
+    tooltipEl.textContent = text;
+    tooltipEl.classList.add('visible');
+    if (e) {
+      tooltipEl.style.left = (e.clientX + 12) + 'px';
+      tooltipEl.style.top  = (e.clientY + 8) + 'px';
+    }
+  }
+  function hideTooltip() { tooltipEl.classList.remove('visible'); }
+  document.addEventListener('mousemove', function(e) {
+    if (!tooltipEl.classList.contains('visible')) return;
+    var w = tooltipEl.offsetWidth;
+    var x = e.clientX + 12;
+    if (x + w > window.innerWidth - 4) x = e.clientX - w - 12;
+    tooltipEl.style.left = x + 'px';
+    tooltipEl.style.top  = (e.clientY + 8) + 'px';
+  });
+
+  /* ==========================================================
+     Esc → 交给 .btn-back（栈空 fallback 到 realms.html）
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('realms.html');
+    } else {
+      location.href = 'realms.html';
+    }
+  }, true);
+
+  /* ==========================================================
+     对外 API
+     ========================================================== */
+  window.mcPending = {
+    getData: function() { return DATA; },
+    refresh: render,
+    reset: function() {
+      DATA.invites = [];
+      saveData(DATA);
+      syncToMainMenu();
+      render();
+    }
+  };
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  syncToMainMenu();
+  render();
+
+})();
+</script>
+
+</body>
+</html>

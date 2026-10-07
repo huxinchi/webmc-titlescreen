@@ -1,0 +1,75 @@
+/* ============ Logo ============ */
+.logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 26px;
+}
+
+.logo-minecraft {
+  width: 256px;
+  height: 44px;
+  object-fit: cover;
+  object-position: top;
+  image-rendering: pixelated;
+  display: block;
+}
+
+.logo-edition {
+  width: 128px;
+  height: 16px;
+  image-rendering: pixelated;
+  display: block;
+}
+
+/* ============ 闪烁标语 ============ */
+.splash {
+  position: fixed;
+  left: 50%;
+  top: 25%;
+  margin-top: calc(9px * var(--ui-scale, 1));
+  margin-left: 123px;
+
+  transform: translate(-50%, -50%) scale(var(--ui-scale, 1));
+  transform-origin: center center;
+
+  pointer-events: none;
+  z-index: 100;
+  display: none;
+}
+
+.splash.visible {
+  display: block;
+}
+
+/* 内层：字号由 JS 设置，动画只做旋转和脉动 */
+.splash-text {
+  display: inline-block;
+
+  /* JS 会根据文本长度动态写入 */
+  font-size: var(--splash-font-size, 16px);
+
+  font-family: 'Minecraft', monospace;
+  color: #ffff00;
+  text-shadow: 1px 1px 0 #3f3f3f;
+  white-space: nowrap;
+  user-select: none;
+  transform-origin: center center;
+
+  /* 源码 textPhase = 1.8 - abs(sin(t%1000/1000×2π))×0.1
+     abs(sin) 周期 = 500ms，phase 范围 1.7 ~ 1.8
+     归一化到 1.75 → 缩放范围 0.9714 ~ 1.0286 */
+  animation: splashBob 1s linear infinite;
+}
+
+@keyframes splashBob {
+  0%   { transform: rotate(-20deg) scale(1.0286); }
+  25%  { transform: rotate(-20deg) scale(0.9714); }
+  50%  { transform: rotate(-20deg) scale(1.0286); }
+  75%  { transform: rotate(-20deg) scale(0.9714); }
+  100% { transform: rotate(-20deg) scale(1.0286); }
+}
+/* hideSplashTexts 选项触发 */
+.splash.hidden {
+  display: none !important;
+}

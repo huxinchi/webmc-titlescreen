@@ -1,0 +1,136 @@
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Credits & Attribution</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+
+
+<link rel="stylesheet" href="css/import.css">
+<script src="js/font.js"></script>
+<link rel="stylesheet" href="css/pano.css">
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  .credits-screen {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  /* HeaderAndFooterLayout 默认 33 / 33 */
+  .credits-header {
+    flex: 0 0 33px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .credits-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  /* 内容区：3 个按钮，宽 210，间距 8，水平居中，靠上 */
+  .credits-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    padding-top: 4px;
+    box-sizing: border-box;
+  }
+
+  .credits-footer {
+    flex: 0 0 33px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  
+</style>
+
+
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="credits-screen">
+
+  <div class="credits-header">
+    <div class="credits-title" data-i18n="credits_and_attribution.screen.title">Credits & Attribution</div>
+  </div>
+
+  <div class="credits-content">
+    <a class="mcbtn mcbtn-210" id="btn-credits"
+       href="https://minecraft.wiki/w/Credits"
+       data-i18n="credits_and_attribution.button.credits">Credits</a>
+
+    <a class="mcbtn mcbtn-210" id="btn-attribution"
+  href="https://aka.ms/MinecraftJavaAttribution"
+       data-i18n="credits_and_attribution.button.attribution">Attribution</a>
+
+    <a class="mcbtn mcbtn-210" id="btn-licenses"
+       href="https://aka.ms/MinecraftJavaLicenses"
+       data-i18n="credits_and_attribution.button.licenses">Licenses</a>
+  </div>
+
+  <div class="credits-footer">
+    <!-- 源码：GUI_DONE 宽 200，用原本的 .mcbtn-long（就是 200×20） -->
+    <a class="mcbtn mcbtn-long btn-back" href="index.html" data-i18n="gui.done">Done</a>
+  </div>
+
+</div>
+
+<script src="js/show_background.js"></script>
+
+<script src="js/main.js"></script>
+</body>
+</html>

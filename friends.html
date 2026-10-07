@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Friends</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/friends/button.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  /* ==========================================================
+     根容器
+     ========================================================== */
+  .friends-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .friends-root > * { pointer-events: auto; }
+
+  /* ==========================================================
+     Tab bar
+     ========================================================== */
+  .friends-tab-bar {
+    display: flex;
+    margin-bottom: 7px;
+    width: 220px;
+  }
+
+  .friends-tab-btn {
+    flex: 0 0 110px;
+    width: 110px;
+    height: 20px;
+    padding: 0 1px;
+    border: none;
+    background-color: transparent;
+    background-image: url('assets/friends/button.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    color: #ffffff;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    text-shadow: 1px 1px 0 #3f3f3f;
+    cursor: pointer;
+    position: relative;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    image-rendering: pixelated;
+  }
+  .friends-tab-btn:hover:not(:disabled) {
+    background-image: url('assets/friends/button_highlighted.png');
+  }
+  .friends-tab-btn:disabled {
+    background-image: url('assets/friends/button_disabled.png');
+    color: #A0A0A0;
+    cursor: not-allowed;
+  }
+  .friends-tab-btn.active {
+    padding-bottom: 2px;
+  }
+  .friends-tab-btn.active::after {
+    content: '';
+    position: absolute;
+    left: 4px; right: 4px;
+    bottom: 1px;
+    height: 1px;
+    background: #ffffff;
+  }
+
+  /* ==========================================================
+     主面板
+     ========================================================== */
+  .friends-panel {
+    width: 236px;
+    max-height: calc(100vh / var(--ui-scale, 1) - 60px);
+    border: 7px solid #C6C6C6;
+    background-color: #373737;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 1px #000000,
+      inset 0 0 0 1px #FFFFFF;
+  }
+
+  .friends-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 220px;
+    box-sizing: border-box;
+  }
+
+  /* ==========================================================
+     AddFriendWidget
+     ========================================================== */
+  .add-friend { padding-bottom: 0; }
+
+  .add-friend-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px 0 8px;
+    box-sizing: border-box;
+  }
+
+  .add-friend-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 20px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    background: #000000;
+    border: 1px solid #a0a0a0;
+    color: #ffffff;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .add-friend-input::placeholder { color: #808080; }
+  .add-friend-input:focus { border-color: #ffffff; }
+  .add-friend-input:disabled { color: #606060; border-color: #606060; }
+
+  .add-friend-btn {
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    background-color: #1a1a1a;
+    background-image: url('assets/friends/send_request.png');
+    background-size: 15px 15px;
+    background-position: center;
+    background-repeat: no-repeat;
+    cursor: pointer;
+    image-rendering: pixelated;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .add-friend-btn:hover:not(:disabled) { background-color: #333333; }
+  .add-friend-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .add-friend-profile {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 8px 0 8px;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+  }
+
+  .add-friend-profile .profile-name {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: inherit;
+    cursor: pointer;
+    outline: none;
+    text-shadow: inherit;
+  }
+  .add-friend-profile .profile-name:hover { text-decoration: underline; }
+
+  .add-friend-separator {
+    height: 2px;
+    margin-top: 4px;
+    background-image: url('assets/friends/list_separator_top.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+  }
+
+  /* ==========================================================
+     条目
+     ========================================================== */
+  .friend-entry,
+  .incoming-entry,
+  .outgoing-entry {
+    position: relative;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+    box-sizing: border-box;
+    cursor: default;
+    user-select: none;
+  }
+
+  .friend-face {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Minecraft', monospace;
+    font-size: 12px;
+    font-weight: bold;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #000;
+    image-rendering: pixelated;
+    box-sizing: border-box;
+  }
+
+  .friend-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .friend-name {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .friend-status {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .friend-status.online  { color: #55FF55; text-shadow: 1px 1px 0 #003300; }
+  .friend-status.offline { color: #A0A0A0; text-shadow: 1px 1px 0 #1a1a1a; }
+
+  .friend-icon-btn {
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    background-color: transparent;
+    background-repeat: no-repeat;
+    background-position: center;
+    cursor: pointer;
+    image-rendering: pixelated;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .friend-icon-btn.remove {
+    background-image: url('assets/friends/remove.png');
+    background-size: 13px 11px;
+  }
+  .friend-icon-btn.remove:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.12);
+  }
+  .friend-icon-btn.remove:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .friend-icon-btn.accept {
+    background-image: url('assets/friends/accept.png');
+    background-size: 18px 18px;
+  }
+  .friend-icon-btn.accept:hover:not(:disabled) {
+    background-image: url('assets/friends/accept_highlighted.png');
+  }
+  .friend-icon-btn.accept:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .friend-icon-btn.reject {
+    background-image: url('assets/friends/reject.png');
+    background-size: 18px 18px;
+  }
+  .friend-icon-btn.reject:hover:not(:disabled) {
+    background-image: url('assets/friends/reject_highlighted.png');
+  }
+  .friend-icon-btn.reject:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .friend-icon-btn.revoke {
+    background-image: url('assets/friends/cancel.png');
+    background-size: 12px 12px;
+  }
+  .friend-icon-btn.revoke:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.12);
+  }
+  .friend-icon-btn.revoke:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ==========================================================
+     空 / 页脚
+     ========================================================== */
+  .friends-empty {
+    padding: 16px 12px;
+    text-align: center;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1.5;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+  }
+
+  .friends-illustration {
+    display: block;
+    width: 128px;
+    height: 48px;
+    margin: 8px auto;
+    background-image: url('assets/friends/illustrations_00.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+  }
+
+  .friends-footer {
+    padding: 8px 12px 12px 12px;
+    text-align: center;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1.5;
+    color: #808080;
+    text-shadow: 1px 1px 0 #1a1a1a;
+  }
+
+  .msa-link {
+    color: #808080;
+    text-decoration: underline;
+    cursor: pointer;
+    text-shadow: 1px 1px 0 #1a1a1a;
+  }
+  .msa-link:hover { color: #ffffff; }
+
+  .pending-header {
+    padding: 8px 8px 4px 8px;
+    text-align: center;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    font-weight: bold;
+    text-decoration: underline;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+  }
+
+
+</style>
+
+
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="friends-root">
+  <div class="friends-tab-bar" id="friends-tab-bar">
+    <button class="friends-tab-btn active" data-tab="friends"
+            data-i18n="gui.friends.tab_friends">Friends</button>
+    <button class="friends-tab-btn" data-tab="pending" id="tab-pending-btn"
+            data-i18n="gui.friends.requests_count">Requests (0)</button>
+  </div>
+  <div class="friends-panel">
+    <div class="friends-content mc-scroll" id="friends-content"></div>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+<script>
+(function() {
+  'use strict';
+/* ==========================================================
+   关闭方式（对齐源码）：
+     1. 点面板/标签栏之外的区域
+     2. Esc 键
+     3. O 键（key.friends）
+   都回到 index.html（模拟 setScreen(backgroundScreen)）
+   ========================================================== */
+/* ==========================================================
+   关闭方式（对齐源码）：
+     1. 点面板/标签栏之外的区域
+     2. Esc 键（永远生效）
+     3. key.friends 绑定的键（默认 KeyO，可在 keybinds 里重绑）
+   都回到 index.html
+   ========================================================== */
+/* ==========================================================
+   关闭方式（对齐源码）：
+     1. 点面板 / 标签栏之外的区域
+     2. Esc 键（永远生效）
+     3. key.friends 绑定的键（默认 KeyO，可在 keybinds 重绑）
+   都走 mcBack.back()，保留返回栈
+   ========================================================== */
+function goBack() {
+  if (window.mcBack && typeof window.mcBack.back === 'function') {
+    window.mcBack.back('index.html');
+  } else {
+    location.href = 'index.html';
+  }
+}
+
+/* 1. 点面板外部关闭 */
+document.addEventListener('pointerdown', function(e) {
+  var panel  = document.querySelector('.friends-panel');
+  var tabbar = document.querySelector('.friends-tab-bar');
+  if (panel  && panel.contains(e.target))  return;
+  if (tabbar && tabbar.contains(e.target)) return;
+  goBack();
+}, true);
+
+/* 2. Esc 键（无论焦点在哪） */
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape') return;
+  e.preventDefault();
+  goBack();
+}, true);
+
+/* 3. key.friends 绑定的键（默认 KeyO，可在 keybinds 重绑） */
+if (window.mcKeybinds && typeof window.mcKeybinds.onPressed === 'function') {
+  window.mcKeybinds.onPressed('key.friends', function() {
+    goBack();
+  }, {
+    ignoreInputs: true,     /* 输入框里打字不触发 */
+    ignoreRepeat: true
+  });
+}
+  var ENABLE_KEY = 'mc_friends_enabled';
+  var MSA_URL    = 'https://aka.ms/MinecraftJavaXboxPrivacyAndSafety';
+
+  /* ==========================================================
+     启动前置检查 —— 未启用 → 跳启用页
+     ========================================================== */
+  function isEnabled() {
+    try { return localStorage.getItem(ENABLE_KEY) === '1'; }
+    catch (e) { return false; }
+  }
+
+  if (!isEnabled()) {
+    location.replace('friends_enable.html');
+    return;
+  }
+
+  /* ==========================================================
+     i18n 工具
+     ========================================================== */
+  function t(key, arg) {
+    if (!window.i18n || !window.i18n.t) return key;
+    var s = window.i18n.t(key);
+    if (arg != null && s.indexOf('%s') >= 0) return s.replace('%s', arg);
+    return s;
+  }
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  function fillMsaLink(templateKey, linkKey) {
+    var tpl = t(templateKey);
+    if (tpl === templateKey || tpl.indexOf('%s') < 0) {
+      return escapeHtml(tpl);
+    }
+    var linkText = t(linkKey);
+    if (linkText === linkKey) linkText = 'Microsoft account';
+    var linkHtml = '<a class="msa-link" href="' + MSA_URL
+                 + '" target="_blank" rel="noopener">'
+                 + escapeHtml(linkText) + '</a>';
+    return escapeHtml(tpl).replace('%s', linkHtml);
+  }
+
+  /* ==========================================================
+     用户名：mcOptions 里的 'username'
+     ========================================================== */
+  function getUsername() {
+    if (window.mcOptions && typeof window.mcOptions.get === 'function') {
+      return window.mcOptions.get('username', 'Steve');
+    }
+    return 'Steve';
+  }
+
+  /* ==========================================================
+     数据
+     ========================================================== */
+  window.mcFriendsData = {
+    myName: getUsername(),
+    friends: [
+      { name: 'Alex',       presence: 'online' },
+      { name: 'Notch',      presence: 'playing_server' },
+      { name: 'Dinnerbone', presence: 'offline' }
+    ],
+    incoming: [ { name: 'Herobrine' } ],
+    outgoing: [ { name: 'Jeb_' } ],
+    sendHandlers: { /* 例：'name': function() {...} */ }
+  };
+
+  /* ==========================================================
+     头像
+     ========================================================== */
+  function avatarHue(name) {
+    var h = 0;
+    for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+    return Math.abs(h) % 360;
+  }
+  function createAvatar(name) {
+    var el = document.createElement('div');
+    el.className = 'friend-face';
+    el.style.background = 'hsl(' + avatarHue(name) + ', 45%, 30%)';
+    el.textContent = (name.charAt(0) || '?').toUpperCase();
+    return el;
+  }
+
+  /* ==========================================================
+     presence
+     ========================================================== */
+  var PRESENCE_LABELS = {
+    online: 'Online',
+    playing_server: 'Playing on a server',
+    playing_realms: 'Playing on Realms',
+    playing_offline: 'Playing singleplayer',
+    playing_hosted_server: 'Playing on a hosted server'
+  };
+  function presenceInfo(presence) {
+    if (!presence || presence === 'offline') {
+      return { text: 'Offline', cls: 'offline' };
+    }
+    return { text: PRESENCE_LABELS[presence] || 'Online', cls: 'online' };
+  }
+
+  /* ==========================================================
+     默认行为 + handle
+     ========================================================== */
+  function defaultRemoveFriend(friend) {
+    var idx = window.mcFriendsData.friends.indexOf(friend);
+    if (idx >= 0) window.mcFriendsData.friends.splice(idx, 1);
+    render();
+  }
+  function defaultAcceptIncoming(req) {
+    var data = window.mcFriendsData;
+    var idx = data.incoming.indexOf(req);
+    if (idx >= 0) data.incoming.splice(idx, 1);
+    data.friends.push({ name: req.name, presence: 'online' });
+    render();
+  }
+  function defaultDeclineIncoming(req) {
+    var idx = window.mcFriendsData.incoming.indexOf(req);
+    if (idx >= 0) window.mcFriendsData.incoming.splice(idx, 1);
+    render();
+  }
+  function defaultRevokeOutgoing(req) {
+    var idx = window.mcFriendsData.outgoing.indexOf(req);
+    if (idx >= 0) window.mcFriendsData.outgoing.splice(idx, 1);
+    render();
+  }
+  function callHandle(entry, name) {
+    if (!entry) return false;
+    var fn = entry[name];
+    if (typeof fn === 'function') {
+      try { fn.call(entry); return true; }
+      catch (e) { console.error('[friends]', name, e); return false; }
+    }
+    return false;
+  }
+
+  /* ==========================================================
+     排序
+     ========================================================== */
+  var PRESENCE_ORDER = {
+    playing_hosted_server: 0, playing_server: 1, playing_realms: 2,
+    playing_offline: 3, online: 4, offline: 5
+  };
+  function presenceOrder(p) {
+    return PRESENCE_ORDER[p] != null ? PRESENCE_ORDER[p] : 5;
+  }
+
+  /* ==========================================================
+     AddFriendWidget
+     ========================================================== */
+  function createAddFriendWidget() {
+    var wrap = document.createElement('div');
+    wrap.className = 'add-friend';
+
+    var row = document.createElement('div');
+    row.className = 'add-friend-row';
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'add-friend-input';
+    input.placeholder = t('gui.friends.enter_nickname');
+
+    var sendBtn = document.createElement('button');
+    sendBtn.type = 'button';
+    sendBtn.className = 'add-friend-btn';
+    sendBtn.disabled = true;
+    sendBtn.title = t('gui.friends.send_request');
+
+    function refreshBtn() { sendBtn.disabled = input.value.trim() === ''; }
+    input.addEventListener('input', refreshBtn);
+
+    function trySend() {
+      var name = input.value.trim();
+      if (!name) return;
+      if (!validateAndSend(name)) return;
+      input.value = '';
+      refreshBtn();
+      render();
+    }
+    sendBtn.addEventListener('click', trySend);
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); trySend(); }
+    });
+
+    row.appendChild(input);
+    row.appendChild(sendBtn);
+    wrap.appendChild(row);
+
+    var profileRow = document.createElement('div');
+    profileRow.className = 'add-friend-profile';
+
+    var label = document.createElement('span');
+    label.textContent = t('gui.friends.my_profile_name');
+
+    var nameBtn = document.createElement('button');
+    nameBtn.type = 'button';
+    nameBtn.className = 'profile-name';
+    nameBtn.textContent = window.mcFriendsData.myName;
+    nameBtn.title = t('gui.friends.copy_to_clipboard');
+    nameBtn.addEventListener('click', function() {
+      try { navigator.clipboard.writeText(window.mcFriendsData.myName); } catch (e) {}
+    });
+
+    profileRow.appendChild(label);
+    profileRow.appendChild(nameBtn);
+    wrap.appendChild(profileRow);
+
+    var sep = document.createElement('div');
+    sep.className = 'add-friend-separator';
+    wrap.appendChild(sep);
+
+    return wrap;
+  }
+
+  function validateAndSend(name) {
+    var data = window.mcFriendsData;
+
+    if (name.toLowerCase() === data.myName.toLowerCase()) {
+      alert(t('gui.friends.validation.cannot_add_self'));
+      return false;
+    }
+    function findIn(arr) {
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i].name.toLowerCase() === name.toLowerCase()) return arr[i];
+      }
+      return null;
+    }
+    if (findIn(data.friends))  { alert(t('gui.friends.validation.already_friend', name)); return false; }
+    if (findIn(data.outgoing)) { alert(t('gui.friends.validation.already_outgoing', name)); return false; }
+    if (findIn(data.incoming)) { alert(t('gui.friends.validation.already_incoming', name)); return false; }
+
+    var entry = { name: name };
+
+    var table = data.sendHandlers || {};
+    var h = table[name];
+    if (h != null) {
+      var fn = (typeof h === 'function') ? h
+             : (h && typeof h.onSend === 'function') ? h.onSend : null;
+      if (fn) {
+        try { fn.call(entry, entry); }
+        catch (e) { console.error('[friends] sendHandlers[' + name + ']', e); }
+        return true;
+      }
+    }
+
+    data.outgoing.push(entry);
+    if (typeof data.onSend === 'function') {
+      try { data.onSend.call(entry, entry); }
+      catch (e) { console.error('[friends] onSend', e); }
+    }
+    return true;
+  }
+
+  /* ==========================================================
+     Friends tab
+     ========================================================== */
+  function renderFriendsTab() {
+    var data = window.mcFriendsData;
+    var frag = document.createDocumentFragment();
+
+    frag.appendChild(createAddFriendWidget());
+
+    if (data.friends.length === 0) {
+      var box = document.createElement('div');
+      box.className = 'friends-empty';
+
+      var ill = document.createElement('div');
+      ill.className = 'friends-illustration';
+      box.appendChild(ill);
+
+      var txt = document.createElement('div');
+      txt.innerHTML = fillMsaLink('gui.friends.empty_state', 'gui.friends.empty_state.link');
+      box.appendChild(txt);
+
+      frag.appendChild(box);
+      return frag;
+    }
+
+    var sorted = data.friends.slice().sort(function(a, b) {
+      return presenceOrder(a.presence) - presenceOrder(b.presence);
+    });
+    sorted.forEach(function(friend) {
+      frag.appendChild(createFriendEntry(friend));
+    });
+    frag.appendChild(createManageAccountFooter());
+
+    return frag;
+  }
+
+  function createManageAccountFooter() {
+    var wrap = document.createElement('div');
+    wrap.className = 'friends-footer';
+    wrap.innerHTML = fillMsaLink(
+      'gui.friends.manage_account_footer',
+      'gui.friends.empty_state.link'
+    );
+    return wrap;
+  }
+
+  function createFriendEntry(friend) {
+    var el = document.createElement('div');
+    el.className = 'friend-entry';
+    el.appendChild(createAvatar(friend.name));
+
+    var info = document.createElement('div');
+    info.className = 'friend-info';
+
+    var name = document.createElement('div');
+    name.className = 'friend-name';
+    name.textContent = friend.name;
+    info.appendChild(name);
+
+    var pInfo = presenceInfo(friend.presence);
+    var status = document.createElement('div');
+    status.className = 'friend-status ' + pInfo.cls;
+    status.textContent = pInfo.text;
+    info.appendChild(status);
+
+    el.appendChild(info);
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'friend-icon-btn remove';
+    removeBtn.title = t('gui.friends.unfriend');
+    removeBtn.addEventListener('click', function() {
+      removeBtn.disabled = true;
+      if (callHandle(friend, 'onRemove')) return;
+      defaultRemoveFriend(friend);
+    });
+    el.appendChild(removeBtn);
+
+    return el;
+  }
+
+  /* ==========================================================
+     Pending tab
+     ========================================================== */
+  function renderPendingTab() {
+    var data = window.mcFriendsData;
+    var frag = document.createDocumentFragment();
+
+    var hasIncoming = data.incoming.length > 0;
+    var hasOutgoing = data.outgoing.length > 0;
+
+    if (!hasIncoming && !hasOutgoing) {
+      var box = document.createElement('div');
+      box.className = 'friends-empty';
+      box.textContent = t('gui.friends.pending.empty');
+      frag.appendChild(box);
+      return frag;
+    }
+
+    if (hasIncoming) {
+      var hdrIn = document.createElement('div');
+      hdrIn.className = 'pending-header';
+      hdrIn.textContent = t('gui.friends.pending.received');
+      frag.appendChild(hdrIn);
+      data.incoming.forEach(function(req) { frag.appendChild(createIncomingEntry(req)); });
+    }
+
+    if (hasOutgoing) {
+      var hdrOut = document.createElement('div');
+      hdrOut.className = 'pending-header';
+      hdrOut.textContent = t('gui.friends.pending.sent');
+      frag.appendChild(hdrOut);
+      data.outgoing.forEach(function(req) { frag.appendChild(createOutgoingEntry(req)); });
+    }
+
+    return frag;
+  }
+
+  function createIncomingEntry(req) {
+    var el = document.createElement('div');
+    el.className = 'incoming-entry';
+    el.appendChild(createAvatar(req.name));
+
+    var info = document.createElement('div');
+    info.className = 'friend-info';
+    var name = document.createElement('div');
+    name.className = 'friend-name';
+    name.textContent = req.name;
+    info.appendChild(name);
+    el.appendChild(info);
+
+    var acceptBtn = document.createElement('button');
+    acceptBtn.type = 'button';
+    acceptBtn.className = 'friend-icon-btn accept';
+    acceptBtn.title = t('gui.friends.accept');
+
+    var rejectBtn = document.createElement('button');
+    rejectBtn.type = 'button';
+    rejectBtn.className = 'friend-icon-btn reject';
+    rejectBtn.title = t('gui.friends.decline');
+
+    acceptBtn.addEventListener('click', function() {
+      acceptBtn.disabled = true; rejectBtn.disabled = true;
+      if (callHandle(req, 'onAccept')) return;
+      defaultAcceptIncoming(req);
+    });
+    rejectBtn.addEventListener('click', function() {
+      acceptBtn.disabled = true; rejectBtn.disabled = true;
+      if (callHandle(req, 'onDecline')) return;
+      defaultDeclineIncoming(req);
+    });
+
+    el.appendChild(acceptBtn);
+    el.appendChild(rejectBtn);
+    return el;
+  }
+
+  function createOutgoingEntry(req) {
+    var el = document.createElement('div');
+    el.className = 'outgoing-entry';
+    el.appendChild(createAvatar(req.name));
+
+    var info = document.createElement('div');
+    info.className = 'friend-info';
+    var name = document.createElement('div');
+    name.className = 'friend-name';
+    name.textContent = req.name;
+    info.appendChild(name);
+    el.appendChild(info);
+
+    var revokeBtn = document.createElement('button');
+    revokeBtn.type = 'button';
+    revokeBtn.className = 'friend-icon-btn revoke';
+    revokeBtn.title = t('gui.friends.cancel_request');
+    revokeBtn.addEventListener('click', function() {
+      revokeBtn.disabled = true;
+      if (callHandle(req, 'onRevoke')) return;
+      defaultRevokeOutgoing(req);
+    });
+    el.appendChild(revokeBtn);
+    return el;
+  }
+
+  /* ==========================================================
+     渲染 + tab
+     ========================================================== */
+  var currentTab = 'friends';
+
+  function render() {
+    var contentEl = document.getElementById('friends-content');
+    var pendingBtn = document.getElementById('tab-pending-btn');
+    if (!contentEl) return;
+
+    var count = window.mcFriendsData.incoming.length;
+    var labelTpl = t('gui.friends.requests_count');
+    if (labelTpl === 'gui.friends.requests_count') {
+      pendingBtn.textContent = 'Requests (' + count + ')';
+    } else {
+      pendingBtn.textContent = labelTpl.replace('%s', count);
+    }
+
+    contentEl.innerHTML = '';
+    contentEl.appendChild(
+      currentTab === 'friends' ? renderFriendsTab() : renderPendingTab()
+    );
+  }
+
+  document.getElementById('friends-tab-bar').addEventListener('click', function(e) {
+    var btn = e.target.closest('.friends-tab-btn');
+    if (!btn) return;
+    var tab = btn.dataset.tab;
+    if (!tab || tab === currentTab) return;
+    currentTab = tab;
+    var all = document.querySelectorAll('.friends-tab-btn');
+    for (var i = 0; i < all.length; i++) {
+      all[i].classList.toggle('active', all[i] === btn);
+    }
+    render();
+  });
+
+  /* ==========================================================
+     对外 API
+     ========================================================== */
+  window.mcFriends = {
+    render: render,
+    getTab: function() { return currentTab; },
+    setTab: function(tab) {
+      if (tab !== 'friends' && tab !== 'pending') return;
+      currentTab = tab;
+      var all = document.querySelectorAll('.friends-tab-btn');
+      for (var i = 0; i < all.length; i++) {
+        all[i].classList.toggle('active', all[i].dataset.tab === tab);
+      }
+      render();
+    },
+    data: window.mcFriendsData,
+    refreshMyName: function() {
+      window.mcFriendsData.myName = getUsername();
+      render();
+    }
+  };
+
+  render();
+
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(function() { render(); });
+  }
+  document.addEventListener('i18n-ready', function() { render(); }, false);
+
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Realms Terms of Service</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  .terms-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .terms-title {
+    position: absolute;
+    top: 17px;
+    left: 0; right: 0;
+    text-align: center;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+  }
+
+  /* 源码：x = width/2 - 120, y = row(5) = 105 */
+  .terms-line {
+    position: absolute;
+    top: 105px;
+    left: calc(50% - 120px);
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .terms-link {
+    color: #3366BB;
+    text-decoration: none;
+    text-shadow: none;
+    cursor: pointer;
+  }
+  .terms-link:hover {
+    color: #6C7AF4;
+  }
+
+  /* 源码：y = row(12) = 196，两个 150 宽按钮居中 */
+  .terms-footer {
+    position: absolute;
+    top: 196px;
+    left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="terms-root">
+
+  <div class="terms-title">Realms Terms of Service</div>
+
+  <div class="terms-line">
+    <span>I agree to the Minecraft Realms</span><a class="terms-link"
+       href="https://minecraft.net/realms/terms"
+       target="_blank" rel="noopener"> Terms of Service</a>
+  </div>
+
+  <div class="terms-footer">
+    <a class="mcbtn mcbtn-150 btn-jmp" id="btn-agree"
+       href="realms.html">Agree</a>
+    <a class="mcbtn mcbtn-150 btn-back" id="btn-disagree"
+       href="index.html">Don't agree</a>
+  </div>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var TOS_KEY = 'mc_realms_tos';
+
+  /* Agree：只写 localStorage —— 跳转交给 <a href="realms.html"> 默认行为
+     （.btn-jmp 让 setupLinks 跳过，不 push 当前页到 fromurl 栈） */
+  document.getElementById('btn-agree').addEventListener('click', function() {
+    try { localStorage.setItem(TOS_KEY, '1'); } catch (e) {}
+  });
+
+  /* Don't agree：交给 .btn-back 自动处理（弹栈 or fallback 到 index.html） */
+
+  /* Esc：等价于 Don't agree */
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('index.html');
+    } else {
+      location.href = 'index.html';
+    }
+  }, true);
+
+})();
+</script>
+
+</body>
+</html>

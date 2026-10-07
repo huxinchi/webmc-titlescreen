@@ -1,0 +1,111 @@
+/* ============ 全局变量 ============ */
+:root {
+  --ui-scale: 1;
+}
+
+/* ============ 字体 ============ */
+@font-face {
+  font-family: 'Minecraft';
+  src: url('../assets/font/minecraft.ttf') format('truetype');
+  font-display: swap;
+}
+
+/* ============ 基础重置 ============ */
+html, body {
+  margin: 0; padding: 0;
+  width: 100%; height: 100%;
+  overflow: hidden;
+  /* 去掉默认点击/聚焦特效 */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+}
+*{
+  font-size: 16px;
+}
+body {
+  color: #fff;
+  font-family: 'Minecraft', monospace;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  position: relative;
+}
+
+.version-text {
+  position: absolute;
+  left: calc(2px * var(--ui-scale, 1));
+  bottom: 0;
+  height: 10px;
+  line-height: 10px;
+  font-family: 'Minecraft', monospace;
+  font-size: 10px;
+  color: #fff;
+  text-shadow: 1px 1px 0 #3f3f3f;
+  pointer-events: none;
+  white-space: nowrap;
+
+  transform-origin: left bottom;
+  transform: scale(var(--ui-scale, 1));
+  will-change: transform;
+}
+
+.copyright-text {
+  position: absolute;
+  right: calc(2px * var(--ui-scale, 1));
+  bottom: 0;
+  height: 10px;
+  line-height: 10px;
+  font-family: 'Minecraft', monospace;
+  font-size: 10px;
+  color: #fff;
+  text-shadow: 1px 1px 0 #3f3f3f;
+  cursor: pointer;
+  white-space: nowrap;
+  background: none; border: none; padding: 0;
+
+  transform-origin: right bottom;
+  transform: scale(var(--ui-scale, 1));
+  will-change: transform;
+}
+/* ==========================================================
+   highContrast 高对比度主题
+   ========================================================== */
+
+/* 按钮：加白边框 */
+html.hc .mcbtn {
+  outline: 1px solid #ffffff;
+  outline-offset: -1px;
+}
+html.hc .mcbtn:disabled {
+  outline-color: #808080;
+}
+
+/* 列表条目：选中时反色 */
+html.hc .mc-list-entry.selected {
+  background-color: #ffffff;
+  color: #000000;
+  text-shadow: none;
+}
+
+/* Slider 轨道：白边框 */
+html.hc .mc-slider .mc-slider-track {
+  outline: 1px solid #ffffff;
+  outline-offset: -1px;
+}
+
+/* Slider 值文本反色 */
+html.hc .mc-slider .acc-slider-label,
+html.hc .acc-slider-label {
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #000000, -1px -1px 0 #000000;
+}
+
+/* 输入框：白边框 */
+html.hc .mc-input {
+  outline: 1px solid #ffffff;
+  outline-offset: -1px;
+}

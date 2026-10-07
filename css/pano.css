@@ -1,0 +1,50 @@
+/* ============ WebGL 画布 ============ */
+#pano-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -2;
+  display: none;
+  pointer-events: none;
+}
+
+/* ============ CSS 回退：equirectangular 平移 ============ */
+#pano-css {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  pointer-events: none;
+  display: block;
+
+  background-image: url('../assets/background/panorama_equirect.png');
+  background-repeat: repeat-x;
+  background-position: calc(-1 * 100vh * 18 / 7) center;
+  background-size: auto calc(100vh * 18 / 7);
+  image-rendering: pixelated;
+
+  animation: panoPan 300s linear infinite;
+  animation-delay: 0.5s;              /* 和 cover 同时开始 */
+}
+
+@keyframes panoPan {
+  from { background-position: calc(-1 * 100vh * 18 / 7) center; }
+  to   { background-position: calc(-3 * 100vh * 18 / 7) center; }
+}
+
+/* ============ 黑色遮盖层 ============ */
+#pano-cover {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: #FFF;
+  pointer-events: none;
+
+  /* 0.5s 后瞬间隐藏（0.01s 是最短过渡，视觉上就是"突然消失"） */
+  animation: coverHide 0.01s linear 0.5s forwards;
+}
+
+@keyframes coverHide {
+  to { opacity: 0; visibility: hidden; }
+}

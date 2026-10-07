@@ -1,0 +1,275 @@
+/* ============ 按钮通用 ============ */
+.mcbtn {
+  border: none;
+  padding: 0 2px;              /* ← 源码 TEXT_MARGIN = 2 */
+  cursor: pointer;
+  background: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  font-family: 'Minecraft', monospace;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #3f3f3f;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.mcbtn:focus,
+.mcbtn:focus-visible,
+.mcbtn:active {
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============ 200×20 长按钮 ============ */
+.mcbtn-long {
+  width: 200px;
+  height: 20px;
+  background-image: url('../assets/button/button.png');
+}
+.mcbtn-long:hover:not(:disabled),
+.mcbtn-long:focus:not(:disabled) {           /* ← 加 :focus，源码 isHoveredOrFocused() */
+  background-image: url('../assets/button/button_highlighted.png');
+}
+.mcbtn-long:disabled {
+  background-image: url('../assets/button/button_disabled.png');
+}
+
+/* ============ 98×20 半宽按钮 ============ */
+.mcbtn-half {
+  width: 98px;
+  height: 20px;
+  background-image: url('../assets/button/button_98.png');
+}
+.mcbtn-half:hover:not(:disabled),
+.mcbtn-half:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_98.png');
+}
+.mcbtn-half:disabled {
+  background-image: url('../assets/button/button_disabled_98.png');
+}
+
+/* ============ 20×20 图标按钮 ============ */
+.mcbtn-icon {
+  width: 20px;
+  height: 20px;
+  background-image: url('../assets/button/button_20.png');
+}
+.mcbtn-icon:hover:not(:disabled),
+.mcbtn-icon:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_20.png');
+}
+.mcbtn-icon:disabled {
+  background-image: url('../assets/button/button_disabled_20.png');
+}
+.mcbtn-icon img {
+  width: 14px;
+  height: 14px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+/* ============ 310×20 整行按钮（对应源码 addBig） ============ */
+.mcbtn-310 {
+  width: 310px;
+  height: 20px;
+  background-image: url('../assets/button/button_310.png');
+}
+.mcbtn-310:hover:not(:disabled),
+.mcbtn-310:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_310.png');
+}
+.mcbtn-310:disabled {
+  background-image: url('../assets/button/button_disabled_310.png');
+}
+/* ============ 禁用态 ============ */
+.mcbtn:disabled {
+  cursor: not-allowed;
+  color: #a0a0a0;              /* -6250336 = #A0A0A0 */
+  text-shadow: 1px 1px 0 #282828;
+}
+.mcbtn-icon:disabled img {
+  opacity: 0.5;
+}
+
+/* ============ 行布局 ============ */
+.icon-row {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.bottom-row {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+/* ==========================================================
+   Select World 专用尺寸
+   ========================================================== */
+
+.mcbtn-71 {
+  width: 71px;
+  height: 20px;
+  background-image: url('../assets/button/button_71.png');
+}
+.mcbtn-71:hover:not(:disabled),
+.mcbtn-71:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_71.png');
+}
+.mcbtn-71:disabled {
+  background-image: url('../assets/button/button_disabled_71.png');
+}
+
+.mcbtn-150 {
+  width: 150px;
+  height: 20px;
+  background-image: url('../assets/button/button_150.png');
+}
+.mcbtn-150:hover:not(:disabled),
+.mcbtn-150:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_150.png');
+}
+.mcbtn-150:disabled {
+  background-image: url('../assets/button/button_disabled_150.png');
+}
+
+/* ==========================================================
+   Lock Icon Button
+   源码：LockIconButton extends Button
+   状态：active ? (hoveredOrFocused ? HOVER : NORMAL) : DISABLED
+   ========================================================== */
+.mc-lock-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  display: inline-block;
+  vertical-align: middle;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+
+/* --- 未锁定 --- */
+.mc-lock-btn[data-state="unlocked"] {
+  background-image: url('../assets/button/unlocked_button.png');
+}
+.mc-lock-btn[data-state="unlocked"]:hover:not(:disabled),
+.mc-lock-btn[data-state="unlocked"]:focus:not(:disabled) {
+  background-image: url('../assets/button/unlocked_button_highlighted.png');
+}
+.mc-lock-btn[data-state="unlocked"]:disabled {
+  background-image: url('../assets/button/unlocked_button_disabled.png');
+}
+
+/* --- 已锁定 --- */
+.mc-lock-btn[data-state="locked"] {
+  background-image: url('../assets/button/locked_button.png');
+}
+.mc-lock-btn[data-state="locked"]:hover:not(:disabled),
+.mc-lock-btn[data-state="locked"]:focus:not(:disabled) {
+  background-image: url('../assets/button/locked_button_highlighted.png');
+}
+.mc-lock-btn[data-state="locked"]:disabled {
+  background-image: url('../assets/button/locked_button_disabled.png');
+}
+
+.mc-lock-btn:disabled {
+  cursor: not-allowed;
+}
+
+/* ==========================================================
+   Checkbox
+   源码：Checkbox extends AbstractButton
+   盒尺寸 17×17（getBoxSize = 9 + 8）
+   高亮条件：isFocused()（源码只用 isFocused，不用 hovered）
+   ========================================================== */
+.mc-checkbox {
+  width: 17px;
+  height: 17px;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  display: inline-block;
+  vertical-align: middle;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+
+/* 未勾选 */
+.mc-checkbox[data-checked="false"] {
+  background-image: url('../assets/button/checkbox.png');
+}
+.mc-checkbox[data-checked="false"]:focus:not(:disabled) {
+  background-image: url('../assets/button/checkbox_highlighted.png');
+}
+
+/* 已勾选 */
+.mc-checkbox[data-checked="true"] {
+  background-image: url('../assets/button/checkbox_selected.png');
+}
+.mc-checkbox[data-checked="true"]:focus:not(:disabled) {
+  background-image: url('../assets/button/checkbox_selected_highlighted.png');
+}
+
+.mc-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ==========================================================
+   Checkbox + 标签 组合（源码：盒子 + 4px 间距 + 文字）
+   ========================================================== */
+.mc-checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  font-family: 'Minecraft', monospace;
+  font-size: var(--font-size, 10px);
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #3f3f3f;
+}
+.mc-checkbox-row .mc-checkbox {
+  pointer-events: none;   /* 点击整行，避免双击触发两次 */
+}
+
+/* ==========================================================
+   Cycle Button
+   源码：CycleButton extends AbstractButton
+   左键 → 下一个；Shift+左键 → 上一个；滚轮上下 → 前后
+   ========================================================== */
+.mc-cycle-btn {
+  /* 复用 mcbtn 的基础样式，这里只确保布局 */
+  white-space: nowrap;
+}
+.mcbtn-210 {
+  width: 210px;
+  height: 20px;
+  background-image: url('../assets/button/button_210.png');
+}
+.mcbtn-210:hover:not(:disabled),
+.mcbtn-210:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_210.png');
+}
+.mcbtn-210:disabled {
+  background-image: url('../assets/button/button_disabled_210.png');
+}
+

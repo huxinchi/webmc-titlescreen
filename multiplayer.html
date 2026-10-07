@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Play Multiplayer</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<link rel="stylesheet" href="css/server_select.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  .server-screen {
+    position: fixed; top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex; flex-direction: column; z-index: 1; overflow: hidden;
+  }
+  .server-header {
+    flex: 0 0 33px; display: flex; align-items: center;
+    justify-content: center; box-sizing: border-box;
+  }
+  .server-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1; color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap; user-select: none;
+  }
+  .server-content {
+    flex: 1 1 auto; min-height: 0;
+    overflow-y: auto; overflow-x: hidden; padding: 2px 0;
+    background-image: url('assets/background/menu_list_background.png');
+    background-repeat: repeat; background-size: 32px 32px;
+    image-rendering: pixelated;
+  }
+  .server-footer {
+    flex: 0 0 60px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px;
+    box-sizing: border-box;
+  }
+  .server-footer-row { display: flex; gap: 4px; justify-content: center; }
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="server-screen">
+
+  <div class="server-header">
+    <div class="server-title" data-i18n="multiplayer.title">Play Multiplayer</div>
+  </div>
+
+  <div class="server-content mc-scroll" id="server-list"></div>
+
+  <div class="server-footer">
+    <div class="server-footer-row">
+      <button class="mcbtn mcbtn-half" id="btn-select" disabled data-i18n="selectServer.select">Join Server</button>
+      <a class="mcbtn mcbtn-half" id="btn-direct" href="direct_join.html"
+         data-i18n="selectServer.direct">Direct Connection</a>
+      <a class="mcbtn mcbtn-half" id="btn-add" href="manage_server.html?mode=add"
+         data-i18n="selectServer.add">Add Server</a>
+    </div>
+    <div class="server-footer-row">
+      <button class="mcbtn mcbtn-71" id="btn-edit"    disabled data-i18n="selectServer.edit">Edit</button>
+      <button class="mcbtn mcbtn-71" id="btn-delete"  disabled data-i18n="selectServer.delete">Delete</button>
+      <button class="mcbtn mcbtn-71" id="btn-refresh"          data-i18n="selectServer.refresh">Refresh</button>
+      <a class="mcbtn mcbtn-71 btn-back" href="index.html" data-i18n="gui.back">Back</a>
+    </div>
+  </div>
+
+</div>
+
+<script src="assets/servers/presets.js"></script>
+<script src="js/main.js"></script>
+<script src="js/server_select.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var STORAGE_KEY     = 'mc_servers';
+  var STORAGE_VERSION = 7;
+  var VERSION_KEY     = 'mc_servers_version';
+  var FN_KEY          = '__fn__';
+
+  /* LAN 世界重现延迟上限（毫秒） */
+  var LAN_REJOIN_MAX_MS = 1800;
+
+  /* ==========================================================
+     普通服务器 —— 存 localStorage，可增删改
+     ========================================================== */
+  var DEFAULT_SERVERS = [
+    {
+      id:   'testserver',
+      name: 'Test Server',
+      ip:   'test.example.com',
+      icon: null,
+      motd: '§aTest server for §bhandle §ftesting',
+      players: { online: 3, max: 20 },
+      playerList: ['Steve', 'Alex', 'Notch'],
+      ping: 42,
+      version: '1.21',
+      status: 'successful',
+      type: 'other',
+
+      onUpdate: function() {
+        var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_';
+        var count = 1 + Math.floor(Math.random() * 5);
+        var players = [];
+        for (var i = 0; i < count; i++) {
+          var s = '';
+          for (var j = 0; j < 5; j++) {
+            s += chars.charAt(Math.floor(Math.random() * chars.length));
+          }
+          players.push(s);
+        }
+        this.players = { online: players.length, max: 20 };
+        this.playerList = players;
+        this.ping = Math.floor(Math.random() * 1000) + 10;
+      },
+
+      onJoin:   function() { alert('join ' + this.name); },
+      onDelete: function() { alert('delete ' + this.name); }
+    }
+  ];
+
+  /* ==========================================================
+     LAN 候选池 —— 每次刷新时全部清空，
+     每个条目独立随机 0~LAN_REJOIN_MAX_MS 延迟后重新出现。
+     ========================================================== */
+  var LAN_SERVERS = [
+    {
+      address: '192.168.1.10:25565',
+      motd: '§eA local world',
+      onJoin: function() { alert('join LAN World'); }
+    },
+    {
+      address: '192.168.1.42:25565',
+      motd: '§7Another local world'
+      /* 无 onJoin —— 出现时也是不可连接的（走断连页） */
+    }
+  ];
+
+  var lanVisible = [];
+  var lanTimers  = [];
+
+  function getVisibleLanServers() {
+    return lanVisible.slice();
+  }
+
+  /* ==========================================================
+     应用 preset —— 地址命中就覆盖动态字段
+     - 保留本地 id / name（用户自定义不被覆盖）
+     - 覆盖 onJoin / onEdit / onDelete / motd / players /
+       playerList / ping / version / type / icon
+     - 未命中 → 把动态字段清干净（防止旧数据残留）
+     ========================================================== */
+  function applyPresetToServer(s) {
+    if (!s || s._isLan || s.type === 'lan') return false;
+
+    var addr = s.ip || s.address || s.name || '';
+    var m = window.mcMatchPreset ? window.mcMatchPreset(addr) : null;
+
+    if (!m || !m.preset) {
+      /* 未命中 → 清掉所有可能残留的动态字段 */
+      delete s.onJoin;
+      delete s.onEdit;
+      delete s.onDelete;
+      delete s.motd;
+      delete s.players;
+      delete s.playerList;
+      delete s.ping;
+      delete s.version;
+      s.type = s.type || 'other';
+      return false;
+    }
+
+    var p = m.preset;
+
+    s.onJoin   = p.onJoin;
+    s.onEdit   = p.onEdit;
+    s.onDelete = p.onDelete;
+
+    s.motd       = p.motd;
+    s.players    = p.players;
+    s.playerList = p.playerList;
+    s.ping       = p.ping;
+    s.version    = p.version;
+    s.type       = p.type || 'other';
+    if (p.icon != null) s.icon = p.icon;
+
+    return true;
+  }
+
+  /* ==========================================================
+     序列化 / 反序列化（支持函数）
+     ========================================================== */
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      if (k === 'status') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {};
+        out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) { console.warn('[multiplayer] revive fn failed:', k, e); }
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    out.status = 'successful';
+    return out;
+  }
+
+  /* ==========================================================
+     loadServers —— 读 localStorage 后立刻应用 preset
+     让页面 0ms 起就有正确的 onJoin / motd / players 等字段
+     ========================================================== */
+  function loadServers() {
+    try {
+      var oldVer = parseInt(localStorage.getItem(VERSION_KEY) || '0', 10);
+      if (oldVer !== STORAGE_VERSION) {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.setItem(VERSION_KEY, String(STORAGE_VERSION));
+      }
+    } catch (e) {}
+
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          var list = deserialize(arr);
+          list.forEach(function(s) {
+            s.status = 'successful';
+            applyPresetToServer(s);   /* ★ 加载后立即应用 */
+          });
+          return list;
+        }
+      }
+    } catch (e) {}
+
+    saveServers(DEFAULT_SERVERS);
+    var fresh = DEFAULT_SERVERS.slice();
+    fresh.forEach(function(s) { applyPresetToServer(s); });
+    return fresh;
+  }
+
+  function saveServers(list) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(list)));
+    } catch (e) {}
+  }
+
+  /* ==========================================================
+     是否可连 —— 只看 onJoin
+     （applyPresetToServer 已在加载 / 结算阶段保证字段正确）
+     ========================================================== */
+  function hasJoinHandle(s) {
+    return typeof s.onJoin === 'function';
+  }
+
+  var SERVERS = loadServers();
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var listEl     = document.getElementById('server-list');
+  var btnSelect  = document.getElementById('btn-select');
+  var btnDirect  = document.getElementById('btn-direct');
+  var btnAdd     = document.getElementById('btn-add');
+  var btnEdit    = document.getElementById('btn-edit');
+  var btnDelete  = document.getElementById('btn-delete');
+  var btnRefresh = document.getElementById('btn-refresh');
+
+  /* ==========================================================
+     列表实例
+     ========================================================== */
+  var list = new window.mcWidgets.ServerSelectionList(listEl, {
+    onSelect: updateButtonState,
+
+    onJoin: function(server) {
+      joinServerFromList(server);
+    },
+
+    onMoveUp: function(server, index) {
+      if (index <= 0) return;
+      var tmp = SERVERS[index - 1];
+      SERVERS[index - 1] = SERVERS[index];
+      SERVERS[index] = tmp;
+      saveServers(SERVERS);
+      refreshListUI();
+    },
+
+    onMoveDown: function(server, index) {
+      if (index >= SERVERS.length - 1) return;
+      var tmp = SERVERS[index + 1];
+      SERVERS[index + 1] = SERVERS[index];
+      SERVERS[index] = tmp;
+      saveServers(SERVERS);
+      refreshListUI();
+    }
+  });
+
+  /* ==========================================================
+     统一渲染入口 —— 普通 + 当前可见的 LAN 一起设
+     ========================================================== */
+  function refreshListUI() {
+    list.setServers(SERVERS);
+    list.setLanServers(getVisibleLanServers());
+  }
+
+  /* ==========================================================
+     刷新 LAN —— 清空 + 各自随机延迟重现
+     ========================================================== */
+  function refreshLanServers() {
+    lanTimers.forEach(function(id) { clearTimeout(id); });
+    lanTimers = [];
+
+    lanVisible = [];
+    list.setLanServers([]);
+
+    var sel = list.getSelected();
+    if (sel && sel._isLan) {
+      list.clearSelected();
+      updateButtonState(null);
+    }
+
+    LAN_SERVERS.forEach(function(s) {
+      var delay = Math.floor(Math.random() * LAN_REJOIN_MAX_MS);
+      var id = setTimeout(function() {
+        lanVisible.push(s);
+        list.setLanServers(getVisibleLanServers());
+      }, delay);
+      lanTimers.push(id);
+    });
+  }
+
+  /* ==========================================================
+     连接服务器
+       1. presets 命中且有 onJoin → 用 preset
+       2. 列表条目自带 onJoin     → 用它
+       3. 都没有                  → 断连页
+     ========================================================== */
+  function joinServerFromList(sel) {
+    if (!sel) return;
+    if (sel._isLanHeader) return;
+
+    var addr = sel.ip || sel.address || sel.name || '';
+
+    var m = window.mcMatchPreset ? window.mcMatchPreset(addr) : null;
+    if (m && typeof m.preset.onJoin === 'function') {
+      try { m.preset.onJoin.call(m.preset); return; }
+      catch (e) { console.error('[multiplayer] preset.onJoin', e); }
+    }
+
+    if (typeof sel.onJoin === 'function') {
+      try { sel.onJoin.call(sel); return; }
+      catch (e) { console.error('[multiplayer] onJoin', e); }
+    }
+
+    showDisconnected(addr);
+  }
+
+  /* ==========================================================
+     跳转连接断开页
+     ========================================================== */
+  function showDisconnected(addr, customReason) {
+    var url = 'disconnected.html?server=' + encodeURIComponent(addr || 'localhost:25565');
+    if (customReason) {
+      url += '&reason=' + encodeURIComponent(customReason);
+    }
+
+    if (window.mcBack && typeof window.mcBack.jump === 'function') {
+      window.mcBack.jump(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  /* ==========================================================
+     按钮状态
+     ========================================================== */
+  function updateButtonState(server) {
+    var isLanHeader = !!server && server._isLanHeader;
+    var isLanEntry  = !!server && (server._isLan || server.type === 'lan');
+    var editable    = !!server && !isLanHeader && !isLanEntry;
+
+    btnSelect.disabled = !server || isLanHeader;
+    btnEdit.disabled   = !editable;
+    btnDelete.disabled = !editable;
+  }
+  updateButtonState(null);
+
+  /* ==========================================================
+     Handle 分发
+     ========================================================== */
+  function dispatch(server, action) {
+    if (!server) return;
+    var fn = server[action];
+    if (typeof fn === 'function') {
+      try { fn.call(server); } catch (e) { console.error('[multiplayer]', action, e); }
+    }
+  }
+
+  btnSelect.addEventListener('click', function() {
+    joinServerFromList(list.getSelected());
+  });
+
+  btnEdit.addEventListener('click', function() {
+    var sel = list.getSelected();
+    if (!sel || sel._isLanHeader || sel._isLan || sel.type === 'lan') return;
+
+    if (typeof sel.onEdit === 'function') {
+      try { sel.onEdit.call(sel); return; } catch (e) { console.error('[multiplayer] onEdit', e); }
+    }
+
+    var target = 'manage_server.html?mode=edit&id=' + encodeURIComponent(sel.id || '');
+    if (window.mcBack && typeof window.mcBack.jump === 'function') {
+      window.mcBack.jump(target);
+    } else {
+      location.href = target;
+    }
+  });
+
+  btnDelete.addEventListener('click', function() {
+  var sel = list.getSelected();
+  if (!sel) return;
+  if (sel._isLanHeader || sel._isLan || sel.type === 'lan') return;
+
+  /* 有自定义 onDelete → 走它 */
+  if (typeof sel.onDelete === 'function') {
+    try { sel.onDelete.call(sel); return; }
+    catch (e) { console.error('[multiplayer] onDelete', e); }
+  }
+
+  /* 否则进删除确认页 */
+  var target = 'delete_server.html?id=' + encodeURIComponent(sel.id || '');
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(target);
+  } else {
+    location.href = target;
+  }
+});
+
+  /* ==========================================================
+     i18n 就绪后重新渲染一次
+     ========================================================== */
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(function() { refreshListUI(); });
+  }
+  document.addEventListener('i18n-ready', function() { refreshListUI(); }, false);
+
+  /* ==========================================================
+     Refresh / F5
+     流程：
+       1. 取消旧 timer，恢复状态
+       2. 普通服务器：全部标 pinging → 渲染
+       3. LAN：清空 → 每个随机 0~1800ms 后重现
+       4. 1 秒后结算普通服务器：
+          - applyPresetToServer（幂等，值不变）
+          - 未命中 preset → 跑本地 onUpdate
+          - status = onJoin 存在 ? successful : unreachable
+     ========================================================== */
+  var refreshTimer = null;
+
+  function refreshServerList(force) {
+    if (refreshTimer && !force) return;
+
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+      refreshTimer = null;
+      SERVERS.forEach(function(s) {
+        if (s._origStatus) { s.status = s._origStatus; delete s._origStatus; }
+      });
+    }
+
+    /* 普通服务器 → pinging */
+    SERVERS.forEach(function(s) {
+      s._origStatus = s.status || 'successful';
+      s.status = 'pinging';
+    });
+    refreshListUI();
+
+    /* LAN → 清空 + 各自随机延迟重现 */
+    refreshLanServers();
+
+    /* 1 秒后结算普通服务器 */
+    refreshTimer = setTimeout(function() {
+      SERVERS.forEach(function(s) {
+        /* 1. 幂等地再跑一次 preset 应用（保险） */
+        var applied = applyPresetToServer(s);
+
+        /* 2. 未命中 preset 才跑本地 onUpdate */
+        if (!applied && typeof s.onUpdate === 'function') {
+          try { s.onUpdate.call(s); } catch (e) { console.error('[server] onUpdate', e); }
+        }
+
+        /* 3. 结算状态 */
+        s.status = hasJoinHandle(s) ? 'successful' : 'unreachable';
+        delete s._origStatus;
+      });
+
+      /* 4. 落盘，让 preset 数据下次打开直接用 */
+      saveServers(SERVERS);
+
+      refreshListUI();
+      refreshTimer = null;
+    }, 1000);
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'F5') {
+      e.preventDefault();
+      refreshServerList(true);
+    }
+  }, true);
+
+  btnRefresh.addEventListener('click', function() {
+    refreshServerList(true);
+  });
+
+  /* ==========================================================
+     对外 API
+     ========================================================== */
+  window.mcMultiplayer = {
+    getServers:     function() { return SERVERS; },
+    getLanServers:  function() { return getVisibleLanServers(); },
+    saveServers:    function() { saveServers(SERVERS); },
+    refreshList:    function() { refreshListUI(); updateButtonState(null); },
+
+    removeServer: function(s) {
+      var idx = SERVERS.indexOf(s);
+      if (idx >= 0) SERVERS.splice(idx, 1);
+      saveServers(SERVERS);
+      refreshListUI();
+      updateButtonState(null);
+    },
+
+    addServer: function(s) {
+      applyPresetToServer(s);      /* ★ 加入前先应用 preset */
+      SERVERS.push(s);
+      saveServers(SERVERS);
+      refreshListUI();
+      updateButtonState(null);
+    },
+
+    joinServer: function(server) { joinServerFromList(server); },
+
+    editServer: function(server) {
+      console.log('[multiplayer] edit', server.name);
+    }
+  };
+
+  /* ==========================================================
+     处理 Direct Join —— 从 direct_join.html 通过 localStorage 传回
+     ========================================================== */
+  (function handlePendingDirectJoin() {
+    var raw = null;
+    try {
+      raw = localStorage.getItem('mc_direct_join');
+      if (raw) localStorage.removeItem('mc_direct_join');
+    } catch (e) {
+      console.warn('[direct] 读取失败', e);
+      return;
+    }
+
+    if (!raw) return;
+
+    var info;
+    try { info = JSON.parse(raw); } catch (e) { return; }
+    if (!info || !info.addr) return;
+
+    setTimeout(function() {
+      var addr   = info.addr;
+      var preset = (window.mcServerPresets || {})[info.preset];
+
+      if (preset && typeof preset.onJoin === 'function') {
+        try { preset.onJoin.call(preset); return; }
+        catch (err) { console.error('[multiplayer] preset.onJoin', err); }
+      }
+
+      showDisconnected(addr);
+    }, 50);
+  })();
+
+  /* ==========================================================
+     启动 —— refreshServerList 内部会清空 LAN 并各自随机重现
+     ========================================================== */
+  refreshServerList(true);
+
+})();
+</script>
+
+</body>
+</html>

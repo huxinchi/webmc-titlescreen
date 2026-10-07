@@ -1,0 +1,58 @@
+/* ============ MC 文本框 ============ */
+.mc-input {
+  width: 200px;
+  height: 20px;
+
+  border: none;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+
+  padding: 0 4px;               /* 源码 bordered → 4px */
+  box-sizing: border-box;
+
+  background: url('../assets/text_field/text_field.png') no-repeat center / 100% 100%;
+  image-rendering: pixelated;
+
+  font-family: 'Minecraft', monospace;
+  color: #E0E0E0;               /* -2039584 = #E0E0E0 */
+  caret-color: #E0E0E0;
+
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* 聚焦态 + 可编辑 → 高亮底图（源码 SPRITES.get(active, focused)） */
+.mc-input:focus:not(:disabled):not([readonly]) {
+  background-image: url('../assets/text_field/text_field_highlighted.png');
+}
+
+/* 不可编辑文字色 */
+.mc-input:disabled,
+.mc-input[readonly] {
+  color: #707070;               /* -9408400 = #707070 */
+  caret-color: transparent;
+}
+
+/* 占位符：源码 DEFAULT_HINT_STYLE = DARK_GRAY */
+.mc-input::placeholder {
+  color: #555555;
+  opacity: 1;
+}
+
+/* 搜索框占位符：源码 SEARCH_HINT_STYLE = GRAY + ITALIC */
+.mc-input.search-hint::placeholder {
+  color: #AAAAAA;
+  font-style: italic;
+}
+
+/* 数字框去掉右侧上下箭头 */
+.mc-input[type="number"]::-webkit-inner-spin-button,
+.mc-input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.mc-input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

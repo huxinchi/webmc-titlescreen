@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Add Server</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  .manage-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .manage-title {
+    position: absolute;
+    top: 17px;
+    left: 0; right: 0;
+    text-align: center;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+  }
+
+  .manage-label {
+    position: absolute;
+    left: calc(50% - 100px);
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .manage-label.label-name { top: 52px; }
+  .manage-label.label-addr { top: 102px; }
+
+  .manage-input-wrap {
+    position: absolute;
+    left: calc(50% - 100px);
+    width: 200px;
+    height: 20px;
+  }
+  #manage-name-wrap { top: 65px; }
+  #manage-addr-wrap { top: 115px; }
+
+  .manage-input-wrap .mc-input {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+  }
+
+  .manage-footer {
+    position: absolute;
+    left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="manage-root">
+
+  <div class="manage-title" id="manage-title">Add Server</div>
+
+  <div class="manage-label label-name">Server Name</div>
+  <div class="manage-input-wrap" id="manage-name-wrap">
+    <input class="mc-input" id="manage-name" type="text" autocomplete="off">
+  </div>
+
+  <div class="manage-label label-addr">Server Address</div>
+  <div class="manage-input-wrap" id="manage-addr-wrap">
+    <input class="mc-input" id="manage-addr" type="text" autocomplete="off">
+  </div>
+
+  <div class="manage-footer" id="manage-footer">
+    <a class="mcbtn mcbtn-half btn-back" id="btn-save" href="multiplayer.html">Add</a>
+    <a class="mcbtn mcbtn-half btn-back" id="btn-cancel" href="multiplayer.html">Cancel</a>
+  </div>
+
+</div>
+
+<script src="assets/servers/presets.js"></script>
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var STORAGE_KEY = 'mc_servers';
+  var FN_KEY      = '__fn__';
+
+  /* ==========================================================
+     URL 参数
+     ========================================================== */
+  function getParam(name) {
+    var m = location.search.match(new RegExp('[?&]' + name + '=([^&]*)'));
+    return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : '';
+  }
+
+  var EDIT_ID = getParam('id');
+  var MODE = (EDIT_ID && getParam('mode') === 'edit') ? 'edit' : 'add';
+
+  /* ==========================================================
+     序列化 / 反序列化
+     ========================================================== */
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) { console.warn('[manage] revive fn failed:', k, e); }
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadServers() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var arr = JSON.parse(raw);
+        if (Array.isArray(arr)) return deserialize(arr);
+      }
+    } catch (e) {}
+    return [];
+  }
+
+  function saveServers(list) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(list)));
+    } catch (e) {}
+  }
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var titleEl   = document.getElementById('manage-title');
+  var nameInput = document.getElementById('manage-name');
+  var addrInput = document.getElementById('manage-addr');
+  var btnSave   = document.getElementById('btn-save');
+  var footerEl  = document.getElementById('manage-footer');
+
+  /* ==========================================================
+     初始化
+     ========================================================== */
+  var SERVERS = loadServers();
+  var editingServer = null;
+
+  if (MODE === 'edit') {
+    titleEl.textContent = 'Edit Server';
+    btnSave.textContent = 'Edit';
+    for (var i = 0; i < SERVERS.length; i++) {
+      if (SERVERS[i].id === EDIT_ID) {
+        editingServer = SERVERS[i];
+        break;
+      }
+    }
+    if (editingServer) {
+      nameInput.value = editingServer.name || '';
+      addrInput.value = editingServer.ip || '';
+    } else {
+      /* 找不到 → 当 add */
+      MODE = 'add';
+      titleEl.textContent = 'Add Server';
+      btnSave.textContent = 'Add';
+    }
+  } else {
+    titleEl.textContent = 'Add Server';
+    btnSave.textContent = 'Add';
+  }
+
+  /* ==========================================================
+     校验：地址非空才允许保存（用 pointer-events 挡住按钮，
+     避免 btn_back.js 的 listener 被意外触发）
+     ========================================================== */
+  function valid() {
+    return addrInput.value.trim().length > 0;
+  }
+  function refreshSaveState() {
+    if (valid()) {
+      btnSave.style.pointerEvents = '';
+      btnSave.style.opacity = '';
+    } else {
+      btnSave.style.pointerEvents = 'none';
+      btnSave.style.opacity = '0.5';
+    }
+  }
+  nameInput.addEventListener('input', refreshSaveState);
+  addrInput.addEventListener('input', refreshSaveState);
+  refreshSaveState();
+
+  /* ==========================================================
+     保存 —— 只写 localStorage。
+     跳转交给 .btn-back（btn_back.js 弹栈 / 栈空 fallback 到 multiplayer.html）
+     ========================================================== */
+  btnSave.addEventListener('click', function() {
+    if (!valid()) return;
+
+    var name = nameInput.value.trim();
+    var ip   = addrInput.value.trim();
+    if (!name) name = ip;
+
+    if (MODE === 'edit' && editingServer) {
+      editingServer.name = name;
+      editingServer.ip   = ip;
+      saveServers(SERVERS);
+      return;
+    }
+
+    /* 新增：查 presets */
+    var match = window.mcMatchPreset ? window.mcMatchPreset(ip) : null;
+
+    if (match) {
+      var p = match.preset;
+      SERVERS.push({
+        id:         'server_' + Date.now(),
+        name:       name || p.name || ip,
+        ip:         ip,
+        icon:       p.icon       || null,
+        motd:       p.motd       || '',
+        players:    p.players    || null,
+        playerList: p.playerList || null,
+        ping:       p.ping       || 0,
+        version:    p.version    || '',
+        status:     p.status     || 'successful',
+        type:       p.type       || 'other',
+        onJoin:     p.onJoin,
+        onEdit:     p.onEdit,
+        onDelete:   p.onDelete
+      });
+    } else {
+      SERVERS.push({
+        id:         'server_' + Date.now(),
+        name:       name || ip,
+        ip:         ip,
+        icon:       null,
+        motd:       '§cCannot connect',
+        players:    null,
+        playerList: null,
+        ping:       0,
+        version:    '',
+        status:     'unreachable',
+        type:       'other'
+      });
+    }
+
+    saveServers(SERVERS);
+    /* 不 preventDefault —— .btn-back 的 listener 会弹栈跳转 */
+  });
+
+  /* ==========================================================
+     定位 Footer
+     ========================================================== */
+  function layoutFooter() {
+    var rootEl = document.querySelector('.manage-root');
+    var h = rootEl.clientHeight || window.innerHeight;
+    var y = Math.floor(h / 4) + 120 + 12;
+    footerEl.style.top = y + 'px';
+  }
+  layoutFooter();
+  window.addEventListener('resize', layoutFooter);
+
+  /* ==========================================================
+     Esc → 交给 .btn-back（栈空 fallback 到 multiplayer）
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (window.mcBack && typeof window.mcBack.back === 'function') {
+        window.mcBack.back('multiplayer.html');
+      }
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (valid()) btnSave.click();
+    }
+  }, true);
+
+  /* 启动 */
+  nameInput.focus();
+
+})();
+</script>
+
+</body>
+</html>

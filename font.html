@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Font Settings</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+
+
+<link rel="stylesheet" href="css/import.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  .font-screen {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  /* HeaderAndFooterLayout 默认 33 / 33 */
+  .font-header {
+    flex: 0 0 33px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .font-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  /* 内容区：滚动容器 + 列表容器 */
+  .font-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    background-image: url('assets/background/menu_list_background.png');
+    background-repeat: repeat;
+    background-size: 32px 32px;
+    image-rendering: pixelated;
+  }
+
+  .font-footer {
+    flex: 0 0 33px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  /* 字体列表用 object_select_list 的通用样式 */
+  .font-list {
+    padding: 2px 0;
+  }
+
+  /* 每项左侧显示字体名，右侧显示路径 */
+  .font-entry {
+    width: 270px;
+    height: 18px;
+    margin: 0 auto;
+    padding: 0 4px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .font-entry:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .font-entry.selected {
+    background-color: rgba(255, 255, 255, 0.16);
+    box-shadow: inset 0 0 0 1px #ffffff;
+  }
+
+  .font-entry .font-name {
+    flex: 0 0 auto;
+    font-weight: normal;
+  }
+
+  .font-entry .font-path {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: #808080;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+
+</style>
+
+
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="font-screen">
+
+  <div class="font-header">
+    <div class="font-title" data-i18n="options.font.title">Font Settings</div>
+  </div>
+
+  <div class="font-content mc-scroll mc-list" id="font-list"></div>
+
+  <div class="font-footer">
+    <a class="mcbtn mcbtn-long btn-back" href="lang.html" data-i18n="gui.done">Done</a>
+  </div>
+
+</div>
+
+<script src="js/show_background.js"></script>
+<script src="js/main.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  var listEl = document.getElementById('font-list');
+
+  /* ==========================================================
+     渲染字体列表
+     数据来自 mcFont.list()，当前使用的项高亮
+     ========================================================== */
+  function render() {
+    if (!window.mcFont) return;
+
+    var fonts = window.mcFont.list();
+    var current = window.mcFont.getCurrent();
+
+    listEl.innerHTML = '';
+
+    for (var name in fonts) {
+      if (!Object.prototype.hasOwnProperty.call(fonts, name)) continue;
+
+      (function(nm, url) {
+        var el = document.createElement('div');
+        el.className = 'font-entry' + (nm === current ? ' selected' : '');
+        el.dataset.name = nm;
+
+        var nameEl = document.createElement('span');
+        nameEl.className = 'font-name';
+        nameEl.textContent = nm;
+
+        var pathEl = document.createElement('span');
+        pathEl.className = 'font-path';
+        pathEl.textContent = url;
+
+        el.appendChild(nameEl);
+        el.appendChild(pathEl);
+
+        el.addEventListener('click', function() {
+          window.mcFont.setCurrent(nm);
+          render();
+        });
+
+        listEl.appendChild(el);
+      })(name, fonts[name]);
+    }
+  }
+
+  render();
+
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(function() {});
+  }
+})();
+</script>
+<script src="js/narrator.js"></script>
+</body>
+</html>

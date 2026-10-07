@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Language</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+<link rel="stylesheet" href="css/import.css">
+<script src="js/font.js"></script>
+<link rel="stylesheet" href="css/pano.css">
+
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  .lang-screen {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+    overflow: hidden;         /* 关键：防止子元素溢出破坏布局 */
+  }
+
+  /* Header：12 + 9 + 15 = 36 */
+  .lang-header {
+    flex: 0 0 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    box-sizing: border-box;
+  }
+
+  .lang-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .lang-search-wrap { display: flex; justify-content: center; }
+  .lang-search-wrap .mc-input { width: 200px; height: 15px; }
+
+  /* 内容区：滚动由 .mc-list 提供，这里只管背景和尺寸 */
+  .lang-content {
+    flex: 1 1 auto;
+    min-height: 0;            /* 关键：flex 子元素能收缩，overflow 才生效 */
+    background-image: url('assets/background/menu_list_background.png');
+    background-repeat: repeat;
+    background-size: 32px 32px;
+    image-rendering: pixelated;
+  }
+
+  /* Footer：53 */
+  .lang-footer {
+    flex: 0 0 53px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-sizing: border-box;
+  }
+
+  .lang-warning {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #babbbe;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    text-align: center;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .lang-bottom-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+</style>
+
+
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="lang-screen">
+
+  <div class="lang-header">
+    <div class="lang-title" data-i18n="options.language.title">Language</div>
+    <div class="lang-search-wrap">
+      <input class="mc-input" id="lang-search" type="text"
+             data-i18n-placeholder="gui.language.search" placeholder="Search...">
+    </div>
+  </div>
+
+  <!-- 一个元素同时是滚动容器 + 列表容器 -->
+  <div class="lang-content mc-scroll mc-list" id="lang-list"></div>
+
+  <div class="lang-footer">
+    <div class="lang-warning" data-i18n="options.languageAccuracyWarning">Note: Some languages are not fully translated</div>
+    <div class="lang-bottom-buttons">
+
+
+<!-- 之后 -->
+<a class="mcbtn mcbtn-150" id="btn-font" href="font.html" data-i18n="options.font">Font...</a>
+      <button class="mcbtn mcbtn-150 noback" id="btn-done" data-i18n="gui.done">Done</button>
+    </div>
+  </div>
+
+</div>
+<!-- <script src="js/apply_option.js"></script>
+<script src="js/option.js"></script>
+<script src="js/uiscale.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/btn_back.js"></script>
+-->
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  var listEl    = document.getElementById('lang-list');
+  var searchBox = document.getElementById('lang-search');
+  var btnDone   = document.getElementById('btn-done');
+  var btnFont   = document.getElementById('btn-font');
+
+  var currentLang = 'en_us';
+  var allLangs = {};
+  var selected = null;
+
+  function render(filter) {
+    filter = (filter || '').trim().toLowerCase();
+
+    var codes = Object.keys(allLangs).sort();
+
+    listEl.innerHTML = '';
+    selected = null;
+
+    for (var i = 0; i < codes.length; i++) {
+      var code = codes[i];
+      var lang = allLangs[code];
+
+      var hay = ((lang.name || '') + ' ' + (lang.region || '')).toLowerCase();
+      if (filter && hay.indexOf(filter) < 0) continue;
+
+      var el = document.createElement('div');
+      el.className = 'mc-list-entry';
+      el.textContent = (lang.name || code) + ' (' + code + ')';
+      el.dataset.code = code;
+
+      if (code === currentLang) {
+        el.classList.add('selected');
+        selected = el;
+      }
+
+      el.addEventListener('click', function() { selectEntry(this); });
+      el.addEventListener('dblclick', function() {
+        selectEntry(this);
+        applySelection();
+      });
+
+      listEl.appendChild(el);
+    }
+
+    if (selected) {
+      var target = selected.offsetTop + selected.offsetHeight / 2 - listEl.clientHeight / 2;
+      listEl.scrollTop = Math.max(0, target);
+    }
+  }
+
+  function selectEntry(el) {
+    var all = listEl.querySelectorAll('.mc-list-entry');
+    for (var i = 0; i < all.length; i++) {
+      all[i].classList.remove('selected');
+    }
+    el.classList.add('selected');
+    selected = el;
+  }
+
+function applySelection() {
+  /* 1. 先应用选中的语言 */
+  if (selected && selected.dataset.code && window.i18n) {
+    window.i18n.setLang(selected.dataset.code);
+  }
+
+  /* 2. 从栈里 pop 上一页；栈空时兜底回 index.html */
+  if (window.mcBack && window.mcBack.back) {
+    window.mcBack.back('index.html');
+  } else {
+    location.href = 'index.html';
+  }
+}
+
+  searchBox.addEventListener('input', function() {
+    render(searchBox.value);
+  });
+
+  btnDone.addEventListener('click', function() {
+    applySelection();
+  });
+
+
+
+  window.i18n.ready(function() {
+    currentLang = window.i18n.getLang();
+    allLangs = window.i18n.getLanguages();
+    render('');
+    searchBox.focus();
+  });
+})();
+</script>
+</body>
+</html>

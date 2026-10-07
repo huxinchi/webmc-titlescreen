@@ -1,0 +1,166 @@
+/* ==========================================================
+   WorldSelectionList —— 世界列表
+   对应源码 WorldSelectionList extends ObjectSelectionList
+   条目高 36，宽 270，水平居中
+   ========================================================== */
+
+.world-entry {
+  width: 270px;
+  max-width: 100%;
+  height: 36px;
+  margin: 0 auto;
+  padding: 0 4px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  font-family: 'Minecraft', monospace;
+  font-size: var(--font-size, 10px);
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #3f3f3f;
+  overflow: hidden;
+}
+
+.world-entry:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.world-entry.selected {
+  background-color: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 1px #ffffff;
+}
+
+.world-icon-wrap {
+  position: relative;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+}
+
+.world-icon {
+  position: absolute;
+  inset: 0;
+  background-image: url('../assets/icon/world_selection/unknown_server.png');
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
+.world-status {
+  position: absolute;
+  inset: 0;
+}
+
+.world-join {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  display: none;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.world-alert {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  display: none;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.world-alert[data-alert="warning"] {
+  display: block;
+  background-image: url('../assets/icon/world_selection/warning.png');
+}
+.world-alert[data-alert="error"] {
+  display: block;
+  background-image: url('../assets/icon/world_selection/error.png');
+}
+
+.world-alert[data-alert="warning"]:hover {
+  background-image: url('../assets/icon/world_selection/warning_highlighted.png');
+}
+.world-alert[data-alert="error"]:hover {
+  background-image: url('../assets/icon/world_selection/error_highlighted.png');
+}
+
+.world-entry:hover .world-join,
+.world-entry.selected .world-join {
+  display: block;
+}
+
+.world-entry:hover .world-join[data-join="join"],
+.world-entry.selected .world-join[data-join="join"] {
+  background-image: url('../assets/icon/world_selection/join.png');
+}
+.world-entry:hover .world-join[data-join="marked_join"],
+.world-entry.selected .world-join[data-join="marked_join"] {
+  background-image: url('../assets/icon/world_selection/marked_join.png');
+}
+
+.world-entry .world-join[data-join="join"]:hover {
+  background-image: url('../assets/icon/world_selection/join_highlighted.png');
+}
+.world-entry .world-join[data-join="marked_join"]:hover {
+  background-image: url('../assets/icon/world_selection/marked_join_highlighted.png');
+}
+
+/* ============ 文字区（3 行） ============ */
+.world-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+}
+
+.world-name {
+  font-family: 'Minecraft', monospace;
+  font-size: var(--font-size, 10px);
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #3f3f3f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 第二行：levelId (日期) —— 源码 #808080 */
+.world-meta {
+  font-family: 'Minecraft', monospace;
+  font-size: var(--font-size, 10px);
+  line-height: 1;
+  color: #808080;
+  text-shadow: 1px 1px 0 #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 第三行：info（游戏模式）—— 源码 #808080 */
+.world-info-text {
+  font-family: 'Minecraft', monospace;
+  font-size: var(--font-size, 10px);
+  line-height: 1;
+  color: #808080;
+  text-shadow: 1px 1px 0 #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>?!Minecraft!?</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+<link rel="preload" as="script" href="js/show_background.js">
+<link rel="preload" as="script" href="js/exit.js">
+<link rel="preload" as="script" href="js/i18n.js">
+
+<style id="target-style">
+  @font-feature-values VulnTestFont {
+    @styleset {
+      entry_a: 1; entry_b: 2; entry_c: 3; entry_d: 4;
+      entry_e: 5; entry_f: 6; entry_g: 7; entry_h: 8;
+    }
+  }
+</style>
+
+<link rel="stylesheet" href="css/import.css">
+<script src="js/font.js"></script>
+<link rel="stylesheet" href="css/pano.css">
+<link rel="stylesheet" href="css/realm.css">
+<link rel="stylesheet" href="css/logos.css">
+<link rel="stylesheet" href="css/index.css">
+
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+<span class="splash" id="splash"><span class="splash-text">Allow JavaScript!</span></span>
+<div class="screen">
+  <div class="logo">
+    <img class="logo-minecraft" id="logo-img" src="assets/logo/minceraft_small.png" alt="Minecraft">
+    <img class="logo-edition" src="assets/logo/edition_small.png" alt="Edition">
+</div> 
+
+
+    <a href="sstart.html" class="mcbtn mcbtn-long" id="sstart" data-i18n="menu.singleplayer">Singleplayer</a>
+    <button class="mcbtn mcbtn-long" id="mstart" data-i18n="menu.multiplayer">Multiplayer</button>
+
+    <button class="mcbtn mcbtn-long" id="realms">
+      <span data-i18n="menu.online">Minecraft Realms</span>
+      <span class="realms-notifications" aria-hidden="true">
+        <img class="realms-notif" id="realms-news"   src="assets/icon/news_notification_mainscreen.png" alt="">
+        <img class="realms-notif" id="realms-invite" src="assets/icon/realms_invite_on.png" alt="">
+        <img class="realms-notif" id="realms-trial"  src="assets/icon/realms_trial_on.png" alt="">
+      </span>
+    </button>
+<button class="mcbtn mcbtn-icon" id="friends" title="Friends">
+  <img src="assets/icon/friends.png" alt="Friends">
+</button>
+      <a class="mcbtn mcbtn-icon" id="lang" href="lang.html" title="Language"><img src="assets/icon/language.png" alt="Language"></a>
+
+<a class="mcbtn mcbtn-icon" id="accessibility" href="accessibility.html" title="Accessibility">
+  <img src="assets/icon/accessibility.png" alt="Accessibility">
+</a>
+   
+
+      <a href="options.html" class="mcbtn mcbtn-half" id="option" data-i18n="menu.options">Options...</a>
+      <button class="mcbtn mcbtn-half" id="exit" onclick="exit()" data-i18n="menu.quit">Quit Game</button>
+   
+
+
+<div class="version-text">Minecraft 26.2</div>
+<a class="copyright-text" href="credits.html" data-i18n="title.credits">Copyright Mojang AB. Do not distribute!</a>
+
+<script src="js/show_background.js"></script>
+<script src="js/show_minecraft.js"></script>
+<script src="js/show_realm.js"></script>
+<script src="js/show_splash.js"></script>
+<script src="js/main.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  function opt(key, fallback) {
+    if (window.mcOptions && typeof window.mcOptions.get === 'function') {
+      return window.mcOptions.get(key, fallback);
+    }
+    return fallback;
+  }
+
+  function jump(target) {
+    if (window.mcBack && typeof window.mcBack.jump === 'function') {
+      window.mcBack.jump(target);
+    } else {
+      location.href = target;
+    }
+  }
+
+  /* Multiplayer */
+  var mstart = document.getElementById('mstart');
+  if (mstart) {
+    mstart.addEventListener('click', function() {
+      var skip = !!opt('options.skipMultiplayerWarning', false);
+      jump(skip ? 'multiplayer.html' : 'multiplayer_warning.html');
+    });
+  }
+/* Realms */
+var realms = document.getElementById('realms');
+if (realms) {
+  realms.addEventListener('click', function() {
+    var agreed = false;
+    try { agreed = localStorage.getItem('mc_realms_tos') === '1'; } catch (e) {}
+    jump(agreed ? 'realms.html' : 'realms_terms.html');
+  });
+}
+  /* Friends */
+  var friends = document.getElementById('friends');
+  if (friends) {
+    friends.addEventListener('click', function() {
+      var enabled = false;
+      try {
+        enabled = localStorage.getItem('mc_friends_enabled') === '1';
+      } catch (e) {}
+      jump(enabled ? 'friends.html' : 'friends_enable.html');
+    });
+  }
+})();
+</script>
+</body>
+</html>

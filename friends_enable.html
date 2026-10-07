@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Enable Friend List</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  .enable-dialog-screen {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+  }
+
+  .enable-dialog {
+    width: 340px;
+    max-width: calc(100vw - 40px);
+    border: 7px solid #555555;
+    background-color: #303030;
+    padding: 10px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow:
+      0 0 0 1px #000000,
+      inset 0 0 0 1px #C6C6C6;
+  }
+
+  .enable-dialog-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    font-weight: bold;
+    text-decoration: underline;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    text-align: center;
+  }
+
+  .enable-dialog-message {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1.5;
+    color: #BABABE;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    text-align: center;
+  }
+
+  .enable-dialog-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .msa-link {
+    color: #808080;
+    text-decoration: underline;
+    cursor: pointer;
+    text-shadow: 1px 1px 0 #1a1a1a;
+  }
+  .msa-link:hover { color: #ffffff; }
+
+
+</style>
+
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="enable-dialog-screen">
+  <div class="enable-dialog">
+    <div class="enable-dialog-title"
+         data-i18n="options.friendsList.confirm.title">Enable Friend List</div>
+    <div class="enable-dialog-message" id="enable-dialog-message">
+      To use the friend list, you need to enable it in your Microsoft account settings.
+    </div>
+    <div class="enable-dialog-buttons">
+      <a class="mcbtn mcbtn-150 btn-jmp" id="enable-yes" href="friends.html"
+         data-i18n="options.friendsList.confirm.turnOn">Enable</a>
+      <a class="mcbtn mcbtn-150 btn-back" id="enable-no" href="index.html"
+         data-i18n="options.friendsList.confirm.turnOff">Cancel</a>
+    </div>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var ENABLE_KEY = 'mc_friends_enabled';
+  var MSA_URL    = 'https://aka.ms/MinecraftJavaXboxPrivacyAndSafety';
+
+  /* 已启用 → 直接去好友页 */
+  try {
+    if (localStorage.getItem(ENABLE_KEY) === '1') {
+      location.replace('friends.html');
+      return;
+    }
+  } catch (e) {}
+
+  /* ==========================================================
+     i18n 工具
+     ========================================================== */
+  function t(key) {
+    return (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+  }
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  function fillMsaLink(templateKey, linkKey) {
+    var tpl = t(templateKey);
+    if (tpl === templateKey || tpl.indexOf('%s') < 0) {
+      return escapeHtml(tpl);
+    }
+    var linkText = t(linkKey);
+    if (linkText === linkKey) linkText = 'Microsoft account';
+    var linkHtml = '<a class="msa-link" href="' + MSA_URL
+                 + '" target="_blank" rel="noopener">'
+                 + escapeHtml(linkText) + '</a>';
+    return escapeHtml(tpl).replace('%s', linkHtml);
+  }
+
+  function refreshRichTexts() {
+    var el = document.getElementById('enable-dialog-message');
+    if (el) {
+      el.innerHTML = fillMsaLink(
+        'options.friendsList.confirm.message',
+        'options.friendsList.confirm.message.link'
+      );
+    }
+  }
+
+  /* ==========================================================
+     Enable：只写 localStorage，跳转交给 <a href> 默认行为
+     Cancel：交给 .btn-back 自动处理
+     ========================================================== */
+  document.getElementById('enable-yes').addEventListener('click', function() {
+    try { localStorage.setItem(ENABLE_KEY, '1'); } catch (e) {}
+    /* 不 preventDefault —— 浏览器走 <a href="friends.html"> */
+  });
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  refreshRichTexts();
+
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(function() { refreshRichTexts(); });
+  }
+  document.addEventListener('i18n-ready', function() { refreshRichTexts(); }, false);
+
+})();
+</script>
+
+</body>
+</html>

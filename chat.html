@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Chat Settings</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<link rel="stylesheet" href="css/options_screen.css">
+<script src="js/font.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="options-screen">
+  <div class="options-header">
+    <div class="options-title" data-i18n="options.chat.title">Chat Settings</div>
+  </div>
+  <div class="options-content mc-scroll" id="opts-list"></div>
+  <div class="options-footer">
+    <a class="mcbtn mcbtn-long btn-back" href="options.html" data-i18n="gui.done">Done</a>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+<script>
+(function() {
+  'use strict';
+  var listEl = document.getElementById('opts-list');
+  if (!listEl || !window.mcWidgets || !window.mcWidgets.OptionsList) return;
+
+  var OPTIONS = {
+    'options.chat.visibility':       { type: 'enum',
+                                       values: ['full','system','hidden'],
+                                       value: 'full',
+                                       valueKey: 'options.chat.visibility.' },
+    'options.chat.color':            { type: 'boolean', value: true },
+    'options.chat.links':            { type: 'boolean', value: true },
+    'options.chat.links.prompt':     { type: 'boolean', value: true },
+    'options.chat.opacity':          { type: 'slider', min: 0, max: 1, step: 0.1, value: 1,   format: 'chatOpacity' },
+    'options.accessibility.text_background_opacity': { type: 'slider', min: 0, max: 1, step: 0.1, value: 0.5, format: 'percent' },
+    'options.chat.scale':            { type: 'slider', min: 0, max: 1, step: 0.1, value: 1,   format: 'percentOrOff' },
+    'options.chat.line_spacing':     { type: 'slider', min: 0, max: 1, step: 0.1, value: 0,   format: 'percent' },
+    'options.chat.delay_instant':    { type: 'slider', min: 0, max: 6, step: 0.1, value: 0,   format: 'chatDelay' },
+    'options.chat.width':            { type: 'slider', min: 0, max: 1, step: 0.1, value: 1,   format: 'percent' },
+    'options.chat.height.focused':   { type: 'slider', min: 0, max: 1, step: 0.1, value: 1,   format: 'percent' },
+    'options.chat.height.unfocused': { type: 'slider', min: 0, max: 1, step: 0.1, value: 0.5, format: 'percent' },
+    'options.narrator':              { type: 'enum',
+                                       values: ['off','all','chat','system'],
+                                       value: 'off',
+                                       valueKey: 'options.narrator.' },
+    'options.autoSuggestCommands':   { type: 'boolean', value: true },
+    'options.hideMatchedNames':      { type: 'boolean', value: true },
+    'options.reducedDebugInfo':      { type: 'boolean', value: false },
+    'options.onlyShowSecureChat':    { type: 'boolean', value: false },
+    'options.chat.drafts':           { type: 'boolean', value: false }
+  };
+
+  var ROWS = [
+    ['options.chat.visibility',       'options.chat.color'],
+    ['options.chat.links',            'options.chat.links.prompt'],
+    ['options.chat.opacity',          'options.accessibility.text_background_opacity'],
+    ['options.chat.scale',            'options.chat.line_spacing'],
+    ['options.chat.delay_instant',    'options.chat.width'],
+    ['options.chat.height.focused',   'options.chat.height.unfocused'],
+    ['options.narrator',              'options.autoSuggestCommands'],
+    ['options.hideMatchedNames',      'options.reducedDebugInfo'],
+    ['options.onlyShowSecureChat',    'options.chat.drafts']
+  ];
+
+  new window.mcWidgets.OptionsList(listEl, { options: OPTIONS, rows: ROWS });
+})();
+</script>
+</body>
+</html>

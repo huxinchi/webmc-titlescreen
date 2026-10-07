@@ -1,0 +1,85 @@
+/* ==========================================================
+   OptionsScreen —— 主选项页
+   源码 HeaderAndFooterLayout(this, 61, 33)
+   Content：GridLayout 2 列，每列 150 宽按钮
+   ========================================================== */
+
+.options-screen {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%) scale(var(--ui-scale, 1));
+  transform-origin: top center;
+  width:  calc(100vw / var(--ui-scale, 1));
+  height: calc(100vh / var(--ui-scale, 1));
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
+  overflow: hidden;
+}
+
+/* ============ Header（61px） ============ */
+.options-header {
+  flex: 0 0 61px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.options-title {
+  font-family: 'Minecraft', monospace;
+  font-size: var(--font-size, 10px);
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #3f3f3f;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* 第二行：FOV slider + Online 按钮，水平居中，间距 8 */
+.options-subheader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.options-subheader > .mcbtn,
+.options-subheader > .mc-slider {
+  width: 150px;
+  height: 20px;
+  box-sizing: border-box;
+}
+
+/* FOV slider 的把手和轨道层级 */
+.options-subheader .mc-slider { position: relative; }
+.options-subheader .mc-slider .mc-slider-handle { z-index: 2; }
+.options-subheader .mc-slider .mc-slider-track  { z-index: 0; }
+
+/* ============ Content ============ */
+.options-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-image: url('../assets/background/menu_list_background.png');
+  background-repeat: repeat;
+  background-size: 32px 32px;
+  image-rendering: pixelated;
+  padding: 2px 0;
+
+  /* 网格：每行 308 宽居中 */
+  display: block;
+}
+
+/* ============ Footer（33px） ============ */
+.options-footer {
+  flex: 0 0 33px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
