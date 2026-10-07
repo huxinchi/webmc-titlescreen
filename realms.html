@@ -998,12 +998,18 @@ popupBtnsEl.appendChild(btnBuy);
   /* ==========================================================
      Handle
      ========================================================== */
-  function fireJoin(server) {
-    if (server && typeof server.onJoin === 'function') {
-      try { server.onJoin.call(server); return; }
-      catch (e) { console.error('[realms] onJoin', e); }
-    }
+/* Play 按钮 / 双击 → 跳加载页，由 realms_connecting.html 走完后调 onJoin */
+function fireJoin(server) {
+  if (!server) return;
+  if (typeof server.onJoin !== 'function') return;
+
+  var url = 'realms_connecting.html?id=' + encodeURIComponent(server.id || '');
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
   }
+}
 
  function fireConfigure(server) {
   if (!isSelfOwned(server)) return;

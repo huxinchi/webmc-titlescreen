@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Connecting...</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  /* 逻辑坐标容器 —— 里面 px 均为逻辑像素 */
+  .rl-screen {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rl-screen > * { pointer-events: auto; }
+
+  /* ---- Title：drawCenteredString(title, width/2, row(3), 0xFFFFFF) ----
+     row(3) = 10 + 3*20 = 70 */
+  .rl-title {
+    position: absolute;
+    left: 50%;
+    top: 70px;
+    transform: translateX(-50%);
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-align: center;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  /* ---- Symbols：row(8) = 10 + 8*20 = 170，颜色 0x808080 ----
+     方块字符用等宽、单行、pre 保留空格 */
+  .rl-symbols {
+    position: absolute;
+    left: 50%;
+    top: 170px;
+    transform: translateX(-50%);
+    font-family: 'Minecraft', monospace;
+    font-size: 12px;
+    line-height: 1;
+    color: #808080;
+    text-align: center;
+    white-space: pre;
+    user-select: none;
+  }
+
+  /* ---- 错误状态：符号行换成红色错误文本 ---- */
+  .rl-screen.error-mode .rl-symbols {
+    color: #ff0000;
+    font-size: var(--font-size, 10px);
+  }
+
+  /* ---- Cancel：newButton(666, width/2 - 106, row(12), 212, 20) ----
+     row(12) = 10 + 12*20 = 250 */
+  .rl-cancel {
+    position: absolute;
+    left: calc(50% - 106px);
+    top: 250px;
+    width: 212px;
+    height: 20px;
+  }
+
+  /* ---- Back（错误后）：newButton(667, width/2 - 106, height/4 + 132)，默认宽 200 ---- */
+  .rl-back {
+    position: absolute;
+    left: calc(50% - 100px);
+    top: calc(25% + 132px);
+    width: 200px;
+    height: 20px;
+    display: none;
+  }
+  .rl-screen.error-mode .rl-cancel { display: none; }
+  .rl-screen.error-mode .rl-back   { display: inline-flex; }
+</style>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rl-screen" id="rl-screen">
+
+  <div class="rl-title"   id="rl-title"></div>
+  <div class="rl-symbols" id="rl-symbols"></div>
+
+  <button class="mcbtn mcbtn-long rl-cancel" id="rl-cancel" type="button"
+          data-i18n="gui.cancel">Cancel</button>
+  <button class="mcbtn mcbtn-long rl-back" id="rl-back" type="button"
+          data-i18n="gui.back">Back</button>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     参数
+       ?id=<realm id>       要连的 Realm（从 localStorage.mc_realms 找）
+       ?title=<text>        覆盖标题
+       ?duration=<ms>       加载时长（默认 1500）
+       ?error=<text>        直接进错误状态（跳过动画）
+     ========================================================== */
+  var params       = new URLSearchParams(location.search);
+  var serverId     = params.get('id')       || '';
+  var titleParam   = params.get('title');
+  var durationP    = params.get('duration');
+  var errorParam   = params.get('error');
+
+  var DEFAULT_TITLE    = 'Connecting to the Realm...';
+  var DEFAULT_DURATION = 1500;
+
+  var duration = DEFAULT_DURATION;
+  if (durationP) {
+    var d = parseFloat(durationP);
+    if (isFinite(d) && d >= 0) duration = d;
+  }
+
+  /* ==========================================================
+     i18n fallback
+     ========================================================== */
+  var FALLBACKS = {
+    'gui.cancel': 'Cancel',
+    'gui.back':   'Back'
+  };
+
+  function t(key) {
+    var v = (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+    if (v === key && FALLBACKS[key] != null) return FALLBACKS[key];
+    return v;
+  }
+
+  /* ==========================================================
+     方块字符动画 —— 20 帧循环
+     对应源码 symbols[] 数组（原文方块字符被编码错误，此处用标准 Unicode 重建）
+     - ▁▂▃▄▅▆ 6 级方块
+     - _ 表示空位
+     - 每帧 11 个元素，元素间空格分隔
+     每 tick 一帧 = 50ms
+     ========================================================== */
+  var SYMBOLS = [
+    '▁ ▂ ▃ ▄ ▅ ▆ ▅ ▄ ▃ ▂ ▁',
+    '_ ▁ ▂ ▃ ▄ ▅ ▆ ▅ ▄ ▃ ▂',
+    '_ _ ▁ ▂ ▃ ▄ ▅ ▆ ▅ ▄ ▃',
+    '_ _ _ ▁ ▂ ▃ ▄ ▅ ▆ ▅ ▄',
+    '_ _ _ _ ▁ ▂ ▃ ▄ ▅ ▆ ▅',
+    '_ _ _ _ _ ▁ ▂ ▃ ▄ ▅ ▆',
+    '_ _ _ _ ▁ ▂ ▃ ▄ ▅ ▆ ▅',
+    '_ _ _ ▁ ▂ ▃ ▄ ▅ ▆ ▅ ▄',
+    '_ _ ▁ ▂ ▃ ▄ ▅ ▆ ▅ ▄ ▃',
+    '_ ▁ ▂ ▃ ▄ ▅ ▆ ▅ ▄ ▃ ▂',
+    '▁ ▂ ▃ ▄ ▅ ▆ ▅ ▄ ▃ ▂ ▁',
+    '▂ ▃ ▄ ▅ ▆ ▅ ▄ ▃ ▂ ▁ _',
+    '▃ ▄ ▅ ▆ ▅ ▄ ▃ ▂ ▁ _ _',
+    '▄ ▅ ▆ ▅ ▄ ▃ ▂ ▁ _ _ _',
+    '▅ ▆ ▅ ▄ ▃ ▂ ▁ _ _ _ _',
+    '▆ ▅ ▄ ▃ ▂ ▁ _ _ _ _ _',
+    '▅ ▆ ▅ ▄ ▃ ▂ ▁ _ _ _ _',
+    '▄ ▅ ▆ ▅ ▄ ▃ ▂ ▁ _ _ _',
+    '▃ ▄ ▅ ▆ ▅ ▄ ▃ ▂ ▁ _ _',
+    '▂ ▃ ▄ ▅ ▆ ▅ ▄ ▃ ▂ ▁ _'
+  ];
+
+  var ANIM_INTERVAL_MS = 50;
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var screenEl  = document.getElementById('rl-screen');
+  var titleEl   = document.getElementById('rl-title');
+  var symbolsEl = document.getElementById('rl-symbols');
+  var cancelEl  = document.getElementById('rl-cancel');
+  var backEl    = document.getElementById('rl-back');
+
+  titleEl.textContent = titleParam || DEFAULT_TITLE;
+
+  /* ==========================================================
+     动画
+     ========================================================== */
+  var animIndex = 0;
+  var animTimer = null;
+  var aborted   = false;
+
+  function startAnim() {
+    symbolsEl.textContent = SYMBOLS[animIndex];
+    animTimer = setInterval(function() {
+      animIndex = (animIndex + 1) % SYMBOLS.length;
+      symbolsEl.textContent = SYMBOLS[animIndex];
+    }, ANIM_INTERVAL_MS);
+  }
+
+  function stopAnim() {
+    if (animTimer) {
+      clearInterval(animTimer);
+      animTimer = null;
+    }
+  }
+
+  /* ==========================================================
+     反序列化 —— 与 realms.html 的 serialize 配对
+     ========================================================== */
+  var FN_KEY = '__fn__';
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) { console.warn('[realms_connecting] revive fn failed:', k, e); }
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  /* ==========================================================
+     从 localStorage.mc_realms 里按 id 找 server 并反序列化
+     ========================================================== */
+  function findRealmServer(id) {
+    if (!id) return null;
+    try {
+      var raw = localStorage.getItem('mc_realms');
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (!obj || typeof obj !== 'object') return null;
+      var servers = obj.servers;
+      if (!Array.isArray(servers)) return null;
+      for (var i = 0; i < servers.length; i++) {
+        if (servers[i] && servers[i].id === id) {
+          return deserialize(servers[i]);
+        }
+      }
+    } catch (e) {
+      console.warn('[realms_connecting] read mc_realms failed', e);
+    }
+    return null;
+  }
+
+  /* ==========================================================
+     完成 / 错误 / 取消
+     ========================================================== */
+  var mainTimer = null;
+
+  function finish() {
+    if (aborted) return;
+    aborted = true;
+    stopAnim();
+
+    var server = findRealmServer(serverId);
+    if (!server || typeof server.onJoin !== 'function') {
+      showError('Could not join the Realm');
+      return;
+    }
+
+    try {
+      server.onJoin.call(server);
+    } catch (e) {
+      console.error('[realms_connecting] onJoin', e);
+      showError(String(e && e.message || e));
+      return;
+    }
+
+    /* onJoin 完成后，延迟一小会儿回 realms.html */
+    setTimeout(goBack, 500);
+  }
+
+  function showError(msg) {
+    aborted = true;
+    stopAnim();
+
+    screenEl.classList.add('error-mode');
+    symbolsEl.textContent = msg;
+
+    cancelEl.style.display = 'none';
+    backEl.style.display   = 'inline-flex';
+  }
+
+  function goBack() {
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('realms.html');
+    } else {
+      location.href = 'realms.html';
+    }
+  }
+
+  /* ==========================================================
+     事件
+     ========================================================== */
+  cancelEl.addEventListener('click', function(e) {
+    e.preventDefault();
+    if (aborted) return;
+    aborted = true;
+    stopAnim();
+    if (mainTimer) clearTimeout(mainTimer);
+    goBack();
+  });
+
+  backEl.addEventListener('click', function(e) {
+    e.preventDefault();
+    goBack();
+  });
+
+  /* Esc → cancelOrBackButtonClicked */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (aborted) {
+        goBack();
+      } else {
+        aborted = true;
+        stopAnim();
+        if (mainTimer) clearTimeout(mainTimer);
+        goBack();
+      }
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  if (errorParam) {
+    showError(errorParam);
+    return;
+  }
+
+  startAnim();
+
+  mainTimer = setTimeout(function() {
+    if (!aborted) finish();
+  }, duration);
+
+})();
+</script>
+
+</body>
+</html>
