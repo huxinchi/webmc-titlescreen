@@ -273,3 +273,16 @@
   background-image: url('../assets/button/button_disabled_210.png');
 }
 
+/* ============ 44×20 开关按钮（对应源码 SwitchGrid 的 44） ============ */
+.mcbtn-44 {
+  width: 44px;
+  height: 20px;
+  background-image: url('../assets/button/button_44.png');
+}
+.mcbtn-44:hover:not(:disabled),
+.mcbtn-44:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_44.png');
+}
+.mcbtn-44:disabled {
+  background-image: url('../assets/button/button_disabled_44.png');
+}

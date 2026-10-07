@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Preset Flat World</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/gui/slot.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .pfw-screen {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  /* 标题：centeredText(title, width/2, 8, -1) */
+  .pfw-title {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  /* Share 标签：x=51, y=30 */
+  .pfw-share-label {
+    position: absolute;
+    left: 51px;
+    top: 30px;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ABABAB;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  /* EditBox：50, 40, width-100, 20 */
+  .pfw-share-input {
+    position: absolute;
+    left: 50px;
+    right: 50px;
+    top: 40px;
+    height: 20px;
+    width: auto;
+    box-sizing: border-box;
+  }
+
+  /* List 标签：x=51, y=68 */
+  .pfw-list-label {
+    position: absolute;
+    left: 51px;
+    top: 68px;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ABABAB;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  /* PresetsList：(0, 80)，高 height-117，行高 24 */
+  .pfw-list {
+    position: absolute;
+    left: 0; right: 0;
+    top: 80px;
+    bottom: 37px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  /* 每个 entry 24 高，水平居中，宽 310 */
+  .pfw-entry {
+    position: relative;
+    width: 310px;
+    max-width: 100%;
+    height: 24px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    cursor: pointer;
+    user-select: none;
+  }
+  .pfw-entry:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+  .pfw-entry.selected {
+    background-color: rgba(255, 255, 255, 0.16);
+    box-shadow: inset 0 0 0 1px #ffffff;
+  }
+
+  /* slot 背景：18×18，位置 entry 左上 +1 */
+  .pfw-slot {
+    position: absolute;
+    left: 1px;
+    top: 1px;
+    width: 18px;
+    height: 18px;
+    background-image: url('../assets/gui/slot.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+
+  /* 物品图标：16×16，位于 slot 中心 */
+  .pfw-slot-item {
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    width: 16px;
+    height: 16px;
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-position: center;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+
+  /* 预设名：位于 slot 右侧 +5，垂直居中 */
+  .pfw-name {
+    position: absolute;
+    left: 24px;         /* 1 + 18 + 5 = 24 */
+    top: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(100% - 28px);
+    pointer-events: none;
+  }
+
+  /* 底部按钮：width/2 - 155 和 width/2 + 5，y = height - 28 */
+  .pfw-footer {
+    position: absolute;
+    left: 50%;
+    bottom: 8px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+  }
+  .pfw-footer .mcbtn {
+    width: 150px;
+    height: 20px;
+  }
+</style>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="pfw-screen">
+
+  <div class="pfw-title" id="pfw-title">Presets</div>
+
+  <div class="pfw-share-label" id="pfw-share-label">Share</div>
+  <input class="mc-input pfw-share-input" id="pfw-share-input" type="text"
+         autocomplete="off" spellcheck="false" maxlength="1230">
+
+  <div class="pfw-list-label" id="pfw-list-label">List</div>
+  <div class="pfw-list mc-scroll" id="pfw-list"></div>
+
+  <div class="pfw-footer">
+    <button class="mcbtn mcbtn-150" id="pfw-select" data-i18n="createWorld.customize.presets.select">Select</button>
+    <button class="mcbtn mcbtn-150" id="pfw-cancel" data-i18n="gui.cancel">Cancel</button>
+  </div>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     i18n fallback
+     ========================================================== */
+  var FALLBACKS = {
+    'createWorld.customize.presets.title':  'Presets',
+    'createWorld.customize.presets.share':  'Share',
+    'createWorld.customize.presets.list':   'List',
+    'createWorld.customize.presets.select': 'Select',
+    'gui.cancel':                           'Cancel',
+
+    'flat_world_preset.unknown':             'Unknown preset',
+    'flat_world_preset.classic_flat':        'Classic Flat',
+    'flat_world_preset.tunnelers_dream':     "Tunnelers' Dream",
+    'flat_world_preset.water_world':         'Water World',
+    'flat_world_preset.overworld':           'Overworld',
+    'flat_world_preset.snowy_kingdom':       'Snowy Kingdom',
+    'flat_world_preset.bottomless_pit':      'Bottomless Pit',
+    'flat_world_preset.desert':              'Desert',
+    'flat_world_preset.redstone_ready':      'Redstone Ready',
+    'flat_world_preset.the_void':            'The Void'
+  };
+
+  function t(key, fallback) {
+    var v = (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+    if (v === key) {
+      if (FALLBACKS[key] != null) return FALLBACKS[key];
+      if (fallback != null) return fallback;
+    }
+    return v;
+  }
+
+  /* ==========================================================
+     预设数据 —— 从 assets/world_presets/flat/ 加载
+     index.js 列出所有文件名，逐个 fetch JSON 解析
+     ========================================================== */
+  var FLAT_DIR = 'assets/world_presets/flat/';
+
+  var PRESETS = [];
+
+  function loadScriptOnce(url) {
+    return new Promise(function(resolve, reject) {
+      var s = document.createElement('script');
+      s.src = url;
+      s.onload  = function() { resolve(); };
+      s.onerror = function() { reject(new Error('load fail: ' + url)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  /* JSON → 定义字符串：
+       layers → "1*block,2*block,..."
+       biome  → ";biome"
+     与 PresetFlatWorldScreen.save() 逻辑等价 */
+  function jsonToDefinition(settings) {
+    var layers = settings.layers || [];
+    var def = layers.map(function(l) {
+      var h = l.height || 1;
+      return (h === 1 ? '' : h + '*') + l.block;
+    }).join(',');
+    var biome = settings.biome || 'minecraft:plains';
+    return def + ';' + biome;
+  }
+
+  /* 加载所有预设 */
+/* ==========================================================
+   预检图标：先试 block，再试 item，都没有就空
+   ========================================================== */
+/* ==========================================================
+   图标解析：优先用 WebGL 渲染真物品图标
+   无 WebGL 或渲染失败 → fallback 到平面贴图
+   ========================================================== */
+function probeImage(url) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload  = function() { resolve(url); };
+    img.onerror = function() { resolve(null); };
+    img.src = url;
+  });
+}
+
+var ICON_ALIASES = {
+  'grass_block':  ['grass_block_side', 'grass_block'],
+  'short_grass':  ['short_grass', 'grass'],
+  'tall_grass':   ['tall_grass_top', 'tall_grass'],
+  'redstone':     ['redstone', 'redstone_dust'],
+  'snow':         ['snow', 'snow_block'],
+  'sand':         ['sand'],
+  'stone':        ['stone'],
+  'water_bucket': ['water_bucket'],
+  'feather':      ['feather'],
+  'barrier':      ['barrier'],
+  'bedrock':      ['bedrock']
+};
+
+function resolveAliasFallback(iconName) {
+  var candidates = ICON_ALIASES[iconName] || [iconName];
+  var tasks = [];
+  candidates.forEach(function(name) {
+    tasks.push(probeImage('assets/block/' + name + '.png'));
+    tasks.push(probeImage('assets/item/' + name + '.png'));
+  });
+  return Promise.all(tasks).then(function(arr) {
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i]) return arr[i];
+    }
+    return '';
+  });
+}
+
+function resolveIconUrl(iconName) {
+  if (window.mcItemIcon && window.mcItemIcon.isSupported()) {
+    return window.mcItemIcon.render('minecraft:' + iconName).then(function(dataURL) {
+      if (dataURL) return dataURL;
+      return resolveAliasFallback(iconName);
+    });
+  }
+  return resolveAliasFallback(iconName);
+}
+
+/* 加载所有预设 */
+function loadPresets() {
+  return loadScriptOnce(FLAT_DIR + 'index.js')
+    .catch(function() { window.__mcFlatPresets = []; })
+    .then(function() {
+      var list = window.__mcFlatPresets || [];
+      var tasks = list.map(function(name) {
+        return fetch(FLAT_DIR + name + '.json')
+          .then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
+          .then(function(json) {
+            if (!json || !json.settings) return null;
+            var display  = json.display || 'minecraft:stone';
+            var iconName = display.replace(/^minecraft:/, '');
+
+            return resolveIconUrl(iconName).then(function(iconUrl) {
+              return {
+                key:        name,
+                iconUrl:    iconUrl,          /* 完整 URL 或空字符串 */
+                definition: jsonToDefinition(json.settings),
+                raw:        json
+              };
+            });
+          })
+          .catch(function(err) {
+            console.warn('[pfw] 加载 ' + name + ' 失败:', err);
+            return null;
+          });
+      });
+      return Promise.all(tasks).then(function(arr) {
+        PRESETS = arr.filter(Boolean);
+      });
+    });
+}
+
+  /* ==========================================================
+     解析超平坦定义字符串
+     格式： [height*]block_id(,[height*]block_id)* ; biome_id
+     例：   minecraft:bedrock,2*minecraft:dirt,minecraft:grass_block;minecraft:plains
+     ========================================================== */
+  var DEFAULT_BIOME = 'minecraft:plains';
+  var MAX_Y = 384;
+
+  function parseFlatDefinition(str) {
+    if (typeof str !== 'string') return null;
+
+    var semi = str.indexOf(';');
+    var layerPart = semi >= 0 ? str.substring(0, semi) : str;
+    var biomePart = semi >= 0 ? str.substring(semi + 1) : '';
+
+    if (!layerPart) return null;
+
+    var layers = [];
+    var filled = 0;
+    var parts = layerPart.split(',');
+
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i].trim();
+      if (!p) continue;
+
+      var height = 1;
+      var block  = p;
+
+      var star = p.indexOf('*');
+      if (star >= 0) {
+        var hStr = p.substring(0, star).trim();
+        block   = p.substring(star + 1).trim();
+        height = parseInt(hStr, 10);
+        if (!isFinite(height) || height < 0) return null;
+      }
+
+      if (!block) return null;
+      if (block.indexOf(':') < 0) block = 'minecraft:' + block;
+
+      var remaining = MAX_Y - filled;
+      if (remaining <= 0) break;
+      if (height > remaining) height = remaining;
+
+      layers.push({ height: height, block: block });
+      filled += height;
+    }
+
+    if (layers.length === 0) return null;
+
+    var biome = biomePart.trim() || DEFAULT_BIOME;
+    if (biome.indexOf(':') < 0) biome = 'minecraft:' + biome;
+
+    return { layers: layers, biome: biome };
+  }
+
+  function stringifyFlatDefinition(parsed) {
+    if (!parsed) return '';
+    var out = parsed.layers.map(function(l) {
+      return (l.height === 1 ? '' : l.height + '*') + l.block;
+    }).join(',');
+    return out + ';' + parsed.biome;
+  }
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var titleEl      = document.getElementById('pfw-title');
+  var shareLabelEl = document.getElementById('pfw-share-label');
+  var shareInput   = document.getElementById('pfw-share-input');
+  var listLabelEl  = document.getElementById('pfw-list-label');
+  var listEl       = document.getElementById('pfw-list');
+  var selectBtn    = document.getElementById('pfw-select');
+  var cancelBtn    = document.getElementById('pfw-cancel');
+
+  /* ==========================================================
+     i18n 应用
+     ========================================================== */
+  function applyI18n() {
+    titleEl.textContent      = t('createWorld.customize.presets.title');
+    shareLabelEl.textContent = t('createWorld.customize.presets.share');
+    listLabelEl.textContent  = t('createWorld.customize.presets.list');
+    selectBtn.textContent    = t('createWorld.customize.presets.select');
+    cancelBtn.textContent    = t('gui.cancel');
+    /* 列表已渲染的话重刷名字 */
+    if (PRESETS.length > 0) renderList();
+  }
+
+  /* ==========================================================
+     当前选中的预设
+     ========================================================== */
+  var selectedKey = null;
+
+  /* 从父页传来的初始 definition（可选） */
+  try {
+    var initial = localStorage.getItem('mc_flat_preset');
+    if (initial) {
+      shareInput.value = initial;
+    }
+  } catch (e) {}
+
+  /* ==========================================================
+     选择预设
+     ========================================================== */
+  function selectPreset(preset) {
+    selectedKey = preset.key;
+    shareInput.value = preset.definition;
+
+    var entries = listEl.querySelectorAll('.pfw-entry');
+    for (var i = 0; i < entries.length; i++) {
+      entries[i].classList.toggle('selected', entries[i].dataset.key === preset.key);
+    }
+
+    updateSelectButton();
+    try { shareInput.setSelectionRange(0, 0); } catch (e) {}
+  }
+
+  /* ==========================================================
+     有效性与按钮态
+     ========================================================== */
+  function updateSelectButton() {
+    /* 原版：active = hasSelected || export.getValue().length() > 1 */
+    selectBtn.disabled = !(selectedKey != null || (shareInput.value || '').length > 1);
+  }
+
+  /* ==========================================================
+     渲染列表
+     ========================================================== */
+  function renderList() {
+    listEl.innerHTML = '';
+
+    PRESETS.forEach(function(preset) {
+      var nameText = t('flat_world_preset.' + preset.key);
+
+      var el = document.createElement('div');
+      el.className = 'pfw-entry';
+      el.dataset.key = preset.key;
+      if (preset.key === selectedKey) el.classList.add('selected');
+
+      var slot = document.createElement('div');
+      slot.className = 'pfw-slot';
+      el.appendChild(slot);
+
+    var item = document.createElement('div');
+item.className = 'pfw-slot-item';
+if (preset.iconUrl) {
+  item.style.backgroundImage = 'url("' + preset.iconUrl + '")';
+}
+el.appendChild(item);
+
+      var name = document.createElement('div');
+      name.className = 'pfw-name';
+      name.textContent = nameText;
+      el.appendChild(name);
+
+      el.addEventListener('click', function() { selectPreset(preset); });
+      el.addEventListener('dblclick', function() {
+        selectPreset(preset);
+        doSelect();
+      });
+
+      listEl.appendChild(el);
+    });
+
+    updateSelectButton();
+  }
+
+  /* ==========================================================
+     父页交互
+     ========================================================== */
+  function goBack() {
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('create_world.html');
+    } else {
+      location.href = 'create_world.html';
+    }
+  }
+
+  function doSelect() {
+    var raw = shareInput.value || '';
+    var parsed = parseFlatDefinition(raw);
+
+    if (!parsed) {
+      window.mcDialog.alert({
+        title:   t('createWorld.customize.presets.title'),
+        message: 'Invalid flat world definition.'
+      });
+      return;
+    }
+
+    try {
+      localStorage.setItem('mc_flat_preset', raw);
+      localStorage.setItem('mc_flat_preset_parsed', JSON.stringify(parsed));
+    } catch (e) {}
+
+    goBack();
+  }
+
+  /* ==========================================================
+     事件
+     ========================================================== */
+  shareInput.addEventListener('input', function() {
+    selectedKey = null;
+    var entries = listEl.querySelectorAll('.pfw-entry');
+    for (var i = 0; i < entries.length; i++) {
+      entries[i].classList.remove('selected');
+    }
+    updateSelectButton();
+  });
+
+  selectBtn.addEventListener('click', doSelect);
+  cancelBtn.addEventListener('click', goBack);
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      goBack();
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  function boot() {
+    applyI18n();
+    updateSelectButton();
+
+    loadPresets().then(function() {
+      renderList();
+      updateSelectButton();
+    });
+  }
+
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(boot);
+  } else {
+    boot();
+  }
+  document.addEventListener('i18n-ready', applyI18n, false);
+
+})();
+</script>
+
+</body>
+</html>

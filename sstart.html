@@ -466,8 +466,13 @@ btnEdit.addEventListener('click', function() {
   });
 
   btnCreate.addEventListener('click', function() {
-    console.log('[world] create new');
-  });
+  var url = 'create_world.html';
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+});
 
   searchBox.addEventListener('input', function() {
     applyFilter(searchBox.value);

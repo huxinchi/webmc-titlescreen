@@ -17,3 +17,6 @@
 
 /* 通用组件 */
 @import url('dialog.css');
+@import url('tooltip.css');
+@import url('tab_bar.css');
+@import url('switch_grid.css');

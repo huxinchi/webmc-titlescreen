@@ -1,0 +1,85 @@
+/* ==========================================================
+   Tab Bar —— 顶部标签栏
+   对齐 MenuTabBar / TabNavigationBar
+   使用原版 widget sprite：tab / tab_highlighted /
+                          tab_selected / tab_selected_highlighted
+   ========================================================== */
+
+.mc-tab-bar {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  height: 24px;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mc-tab-bar-inner {
+  position: relative;
+  display: flex;
+  gap: 0;
+  align-items: flex-end;
+  height: 24px;
+  z-index: 1;
+}
+
+/* 单个 tab —— 24px 高，贴图铺满（原版也是拉伸贴图） */
+.mc-tab-button {
+  position: relative;
+  z-index: 1;
+  height: 24px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border: none;
+  background-color: transparent;
+  background-image: url('../assets/tab/tab.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  color: #A0A0A0;
+  font-family: 'Minecraft', monospace;
+  font-size: var(--font-size, 10px);
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  image-rendering: pixelated;
+}
+
+.mc-tab-button:hover {
+  background-image: url('../assets/tab/tab_highlighted.png');
+  color: #FFFFFF;
+}
+
+.mc-tab-button.selected {
+  background-image: url('../assets/tab/tab_selected.png');
+  color: #FFFFFF;
+  text-shadow: 1px 1px 0 #3f3f3f;
+}
+
+.mc-tab-button.selected:hover {
+  background-image: url('../assets/tab/tab_selected_highlighted.png');
+}
+
+/* 底部黑线：全宽，被 tab 遮住中间那段 */
+.mc-tab-bar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: #000000;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Tab 内容容器交由调用页面自定义 */

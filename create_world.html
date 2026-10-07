@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Create New World</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_background.png">
+<link rel="preload" as="image" href="assets/tab/tab_header_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<link rel="stylesheet" href="css/tab_bar.css">
+<link rel="stylesheet" href="css/switch_grid.css">
+<link rel="stylesheet" href="css/tooltip.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .cw-screen {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .cw-header-bg {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 24px;
+    background-image: url('../assets/tab/tab_header_background.png');
+    background-repeat: repeat;
+    background-size: 16px 16px;
+    image-rendering: pixelated;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .cw-content-bg {
+    position: absolute;
+    top: 24px;
+    left: 0; right: 0;
+    bottom: 33px;
+    background-image: url('../assets/background/menu_background.png'),
+                      url('../assets/background/menu_list_background.png');
+    background-repeat: repeat, repeat;
+    background-size: 32px 32px, 32px 32px;
+    image-rendering: pixelated;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #cw-tabbar-container {
+    position: relative;
+    z-index: 2;
+    flex: 0 0 24px;
+  }
+
+  .cw-tab-area {
+    position: relative;
+    z-index: 1;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .cw-tab-content {
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0 16px;
+    box-sizing: border-box;
+    gap: 8px;
+  }
+  .cw-tab-content.active { display: flex; }
+
+  .cw-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .cw-row-label {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    text-align: center;
+    user-select: none;
+  }
+
+  .cw-input-208 { width: 208px; height: 20px; }
+  .cw-input-308 { width: 308px; height: 20px; }
+
+  .cw-row-2col {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    justify-content: center;
+  }
+  .cw-row-2col > * {
+    flex: 0 0 150px;
+    width: 150px;
+  }
+
+  .cw-footer {
+    position: relative;
+    z-index: 1;
+    flex: 0 0 33px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-sizing: border-box;
+    background: transparent;
+  }
+  .cw-footer::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: #000000;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="cw-screen">
+  <div class="cw-header-bg"></div>
+  <div class="cw-content-bg"></div>
+
+  <div id="cw-tabbar-container"></div>
+
+  <div class="cw-tab-area" id="cw-tab-area">
+    <div class="cw-tab-content" id="cw-tab-game"></div>
+    <div class="cw-tab-content" id="cw-tab-world"></div>
+    <div class="cw-tab-content" id="cw-tab-more"></div>
+  </div>
+
+  <div class="cw-footer">
+    <button class="mcbtn mcbtn-150" id="cw-create" data-i18n="selectWorld.create">Create New World</button>
+    <button class="mcbtn mcbtn-150" id="cw-cancel" data-i18n="gui.cancel">Cancel</button>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var FALLBACKS = {
+    'selectWorld.create':           'Create New World',
+    'gui.cancel':                   'Cancel',
+    'selectWorld.enterName':        'World Name',
+    'selectWorld.gameMode':         'Game Mode',
+    'options.difficulty':           'Difficulty',
+    'selectWorld.allowCommands':    'Allow Cheats',
+    'selectWorld.allowCommands.info': 'Allows the use of commands. This disables achievements.',
+    'selectWorld.enterSeed':        'Seed',
+    'selectWorld.seedInfo':         'Leave blank for a random seed',
+    'selectWorld.mapType':          'World Type',
+    'selectWorld.customizeType':    'Customize',
+    'selectWorld.mapFeatures':      'Generate Structures',
+    'selectWorld.mapFeatures.info': 'Villages, shipwrecks, etc.',
+    'selectWorld.bonusItems':       'Bonus Chest',
+    'selectWorld.gameRules':        'Game Rules',
+    'selectWorld.dataPacks':        'Data Packs',
+    'selectWorld.experiments':      'Experiments',
+    'selectWorld.newWorld':         'New World',
+    'selectWorld.targetFolder':     'Saving to: %s',
+
+    'createWorld.tab.game.title':   'Game',
+    'createWorld.tab.world.title':  'World',
+    'createWorld.tab.more.title':   'More',
+
+    'selectWorld.gameMode.survival':        'Survival',
+    'selectWorld.gameMode.survival.info':   'Explore, build, and survive. You have limited health and hunger.',
+    'selectWorld.gameMode.hardcore':        'Hardcore',
+    'selectWorld.gameMode.hardcore.info':   'Survival mode locked to the hardest difficulty. Death is permanent.',
+    'selectWorld.gameMode.creative':        'Creative',
+    'selectWorld.gameMode.creative.info':   'Unlimited resources, free flight, and instant building.',
+
+    'options.difficulty.peaceful':          'Peaceful',
+    'options.difficulty.peaceful.info':     'No hostile mobs and no hunger.',
+    'options.difficulty.easy':              'Easy',
+    'options.difficulty.easy.info':         'Hostile mobs spawn but deal less damage.',
+    'options.difficulty.normal':            'Normal',
+    'options.difficulty.normal.info':       'Standard difficulty.',
+    'options.difficulty.hard':              'Hard',
+    'options.difficulty.hard.info':         'Hostile mobs deal more damage.',
+
+    'options.on':  'ON',
+    'options.off': 'OFF',
+
+    'generator.minecraft.normal':                  'Default',
+    'generator.minecraft.flat':                    'Superflat',
+    'generator.minecraft.large_biomes':            'Large Biomes',
+    'generator.minecraft.amplified':               'AMPLIFIED',
+    'generator.minecraft.amplified.info':          'Notice: Just for fun! Requires a beefy computer.',
+    'generator.minecraft.single_biome_surface':    'Single Biome',
+    'generator.minecraft.debug_all_block_states':  'Debug Mode',
+    'generator.custom':                            'Custom'
+  };
+
+  function t(key, fallback) {
+    var v = (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+    if (v === key) {
+      if (FALLBACKS[key] != null) return FALLBACKS[key];
+      if (fallback != null) return fallback;
+    }
+    return v;
+  }
+
+  /* ==========================================================
+     序列化 / 反序列化
+     ========================================================== */
+  var STORAGE_KEY = 'mc_worlds';
+  var FN_KEY      = '__fn__';
+
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {};
+        out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadWorlds() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      var arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return [];
+      return arr;
+    } catch (e) { return []; }
+  }
+
+  function saveWorlds(list) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(list)));
+    } catch (e) {}
+  }
+
+  /* ==========================================================
+     常量
+     ========================================================== */
+  var GAME_MODES = [
+    { key: 'SURVIVAL', displayKey: 'selectWorld.gameMode.survival', infoKey: 'selectWorld.gameMode.survival.info' },
+    { key: 'HARDCORE', displayKey: 'selectWorld.gameMode.hardcore', infoKey: 'selectWorld.gameMode.hardcore.info' },
+    { key: 'CREATIVE', displayKey: 'selectWorld.gameMode.creative', infoKey: 'selectWorld.gameMode.creative.info' }
+  ];
+
+  var DIFFICULTIES = [
+    { key: 'PEACEFUL', displayKey: 'options.difficulty.peaceful', infoKey: 'options.difficulty.peaceful.info' },
+    { key: 'EASY',     displayKey: 'options.difficulty.easy',     infoKey: 'options.difficulty.easy.info' },
+    { key: 'NORMAL',   displayKey: 'options.difficulty.normal',   infoKey: 'options.difficulty.normal.info' },
+    { key: 'HARD',     displayKey: 'options.difficulty.hard',     infoKey: 'options.difficulty.hard.info' }
+  ];
+
+  var ALL_PRESETS = [
+    { key: 'normal',                  nameKey: 'generator.minecraft.normal',                 editable: false },
+    { key: 'flat',                    nameKey: 'generator.minecraft.flat',                   editable: true  },
+    { key: 'large_biomes',            nameKey: 'generator.minecraft.large_biomes',           editable: false },
+    { key: 'amplified',               nameKey: 'generator.minecraft.amplified',              editable: false, infoKey: 'generator.minecraft.amplified.info' },
+    { key: 'single_biome_surface',    nameKey: 'generator.minecraft.single_biome_surface',   editable: true  },
+    { key: 'debug_all_block_states',  nameKey: 'generator.minecraft.debug_all_block_states', editable: false }
+  ];
+
+  var NORMAL_PRESETS = ALL_PRESETS.filter(function(p) {
+    return p.key !== 'debug_all_block_states';
+  });
+
+  function findPreset(key) {
+    for (var i = 0; i < ALL_PRESETS.length; i++) {
+      if (ALL_PRESETS[i].key === key) return ALL_PRESETS[i];
+    }
+    return ALL_PRESETS[0];
+  }
+
+  /* ==========================================================
+     状态机
+     ========================================================== */
+  function computeTargetFolder(name) {
+    var trimmed = (name || '').trim();
+    if (!trimmed) trimmed = t('selectWorld.newWorld', 'New World');
+    var sanitized = trimmed.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim();
+    if (!sanitized) sanitized = 'World';
+    return sanitized;
+  }
+
+  var state = {
+    name: 'New World',
+    gameMode: 'SURVIVAL',
+    difficulty: 'NORMAL',
+    allowCommands: null,
+    seed: '',
+    generateStructures: true,
+    bonusChest: false,
+    worldType: 'normal',
+    targetFolder: '',
+    flatPreset: null,
+    flatPresetParsed: null,
+    listeners: []
+  };
+
+  state.addListener = function(fn) { state.listeners.push(fn); };
+
+  state.onChanged = function() {
+    if (state.gameMode === 'HARDCORE') {
+      state.difficulty = 'HARD';
+    }
+    state.targetFolder = computeTargetFolder(state.name);
+    for (var i = 0; i < state.listeners.length; i++) {
+      try { state.listeners[i](state); } catch (e) { console.error('[cw] listener', e); }
+    }
+  };
+
+  state.isHardcore = function() { return state.gameMode === 'HARDCORE'; };
+  state.isDebug = function() { return state.worldType === 'debug_all_block_states'; };
+
+  state.getAllowCommands = function() {
+    if (state.isDebug()) return true;
+    if (state.isHardcore()) return false;
+    if (state.allowCommands == null) {
+      return state.gameMode === 'CREATIVE';
+    }
+    return state.allowCommands;
+  };
+
+  state.targetFolder = computeTargetFolder(state.name);
+
+  /* ==========================================================
+     小工具
+     ========================================================== */
+  function makeBtn(sizeClass, text) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mcbtn ' + sizeClass;
+    if (text != null) b.textContent = text;
+    return b;
+  }
+
+  /* ==========================================================
+     Game Tab
+     ========================================================== */
+  function buildGameTab() {
+    var wrap = document.getElementById('cw-tab-game');
+    wrap.innerHTML = '';
+
+    var nameRow = document.createElement('div');
+    nameRow.className = 'cw-row';
+
+    var nameLabel = document.createElement('div');
+    nameLabel.className = 'cw-row-label';
+    nameLabel.setAttribute('data-i18n', 'selectWorld.enterName');
+    nameLabel.textContent = t('selectWorld.enterName');
+    nameRow.appendChild(nameLabel);
+
+    var nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'mc-input cw-input-208';
+    nameInput.value = state.name;
+    nameInput.setAttribute('autocomplete', 'off');
+    nameInput.setAttribute('spellcheck', 'false');
+    nameRow.appendChild(nameInput);
+
+    wrap.appendChild(nameRow);
+
+    window.mcTooltip.attach(nameInput, function() {
+      var tpl = t('selectWorld.targetFolder', 'Saving to: %s');
+      return tpl.indexOf('%s') >= 0 ? tpl.replace('%s', state.targetFolder) : tpl;
+    });
+
+    /* 游戏模式 */
+    var gmBtnEl = makeBtn('mcbtn-210');
+    wrap.appendChild(gmBtnEl);
+
+    var gmBtn = new window.mcWidgets.CycleButton(gmBtnEl, {
+      values: GAME_MODES.map(function(m) { return m.key; }),
+      value: state.gameMode,
+      labelKey: 'selectWorld.gameMode',
+      displayState: 'NAME_AND_VALUE',
+      valueKeyFn: function(v) {
+        var m = GAME_MODES.filter(function(x) { return x.key === v; })[0];
+        return m ? m.displayKey : null;
+      },
+      tResolver: t,
+      onChange: function(v) {
+        state.gameMode = v;
+        state.onChanged();
+      }
+    });
+
+    window.mcTooltip.attach(gmBtnEl, function() {
+      var v = gmBtn.getValue();
+      var m = GAME_MODES.filter(function(x) { return x.key === v; })[0];
+      return m ? t(m.infoKey) : '';
+    });
+
+    /* 难度 */
+    var diffBtnEl = makeBtn('mcbtn-210');
+    wrap.appendChild(diffBtnEl);
+
+    var diffBtn = new window.mcWidgets.CycleButton(diffBtnEl, {
+      values: DIFFICULTIES.map(function(d) { return d.key; }),
+      value: state.difficulty,
+      labelKey: 'options.difficulty',
+      displayState: 'NAME_AND_VALUE',
+      valueKeyFn: function(v) {
+        var d = DIFFICULTIES.filter(function(x) { return x.key === v; })[0];
+        return d ? d.displayKey : null;
+      },
+      tResolver: t,
+      onChange: function(v) {
+        state.difficulty = v;
+        state.onChanged();
+      }
+    });
+
+    window.mcTooltip.attach(diffBtnEl, function() {
+      var v = diffBtn.getValue();
+      var d = DIFFICULTIES.filter(function(x) { return x.key === v; })[0];
+      return d ? t(d.infoKey) : '';
+    });
+
+    /* 作弊 */
+    var allowBtn = makeBtn('mcbtn-210');
+    wrap.appendChild(allowBtn);
+
+    function updateAllow() {
+      var v = state.getAllowCommands();
+
+      allowBtn.innerHTML = '';
+      var lbl = document.createElement('span');
+      lbl.setAttribute('data-i18n', 'selectWorld.allowCommands');
+      lbl.textContent = t('selectWorld.allowCommands');
+      allowBtn.appendChild(lbl);
+      allowBtn.appendChild(document.createTextNode(': '));
+
+      var valKey = v ? 'options.on' : 'options.off';
+      var val = document.createElement('span');
+      val.setAttribute('data-i18n', valKey);
+      val.textContent = t(valKey);
+      allowBtn.appendChild(val);
+
+      allowBtn.disabled = state.isHardcore() || state.isDebug();
+    }
+    allowBtn.addEventListener('click', function() {
+      if (allowBtn.disabled) return;
+      state.allowCommands = !state.getAllowCommands();
+      state.onChanged();
+    });
+    window.mcTooltip.attach(allowBtn, function() { return t('selectWorld.allowCommands.info'); });
+
+    state.addListener(function() {
+      if (nameInput.value !== state.name) nameInput.value = state.name;
+
+      if (state.isHardcore() && diffBtn.getValue() !== 'HARD') {
+        diffBtn.value = 'HARD';
+        diffBtn._updateLabel();
+      }
+
+      gmBtnEl.disabled = state.isDebug();
+      diffBtnEl.disabled = state.isHardcore();
+      updateAllow();
+    });
+
+    nameInput.addEventListener('input', function() {
+      state.name = nameInput.value;
+      state.onChanged();
+    });
+
+    updateAllow();
+  }
+
+  /* ==========================================================
+     World Tab
+     ========================================================== */
+  function buildWorldTab() {
+    var wrap = document.getElementById('cw-tab-world');
+    wrap.innerHTML = '';
+
+    var row1 = document.createElement('div');
+    row1.className = 'cw-row-2col';
+
+    var typeBtnEl = makeBtn('mcbtn-150');
+    row1.appendChild(typeBtnEl);
+
+    var typeBtn = new window.mcWidgets.CycleButton(typeBtnEl, {
+      values: NORMAL_PRESETS.map(function(p) { return p.key; }),
+      value: state.worldType,
+      labelKey: 'selectWorld.mapType',
+      displayState: 'NAME_AND_VALUE',
+      valueKeyFn: function(v) {
+        var p = findPreset(v);
+        return p ? p.nameKey : null;
+      },
+      tResolver: t,
+      onChange: function(v) {
+        state.worldType = v;
+        state.onChanged();
+      }
+    });
+
+    /* Alt 切 debug */
+    function prepareTypeList(altKey) {
+      var targetList = (altKey ? ALL_PRESETS : NORMAL_PRESETS).map(function(p) { return p.key; });
+      var changed = typeBtn.setValues(targetList);
+      if (changed) {
+        state.worldType = typeBtn.getValue();
+        state.onChanged();
+      }
+    }
+
+    typeBtnEl.addEventListener('mousedown', function(e) {
+      prepareTypeList(e.altKey);
+    }, true);
+
+    typeBtnEl.addEventListener('wheel', function(e) {
+      prepareTypeList(e.altKey);
+    }, true);
+
+    window.mcTooltip.attach(typeBtnEl, function() {
+      var p = findPreset(typeBtn.getValue());
+      return (p && p.infoKey) ? t(p.infoKey) : '';
+    });
+
+    var customizeBtn = makeBtn('mcbtn-150');
+    customizeBtn.setAttribute('data-i18n', 'selectWorld.customizeType');
+    customizeBtn.textContent = t('selectWorld.customizeType');
+    customizeBtn.addEventListener('click', function() {
+      if (state.worldType === 'flat') {
+        var url = 'preset_flat_world.html';
+        if (window.mcBack && typeof window.mcBack.jump === 'function') {
+          window.mcBack.jump(url);
+        } else {
+          location.href = url;
+        }
+        return;
+      }
+      window.mcDialog.alert({
+        title:   t('selectWorld.customizeType'),
+        message: 'World customization is not available in the web edition.'
+      });
+    });
+    row1.appendChild(customizeBtn);
+
+    wrap.appendChild(row1);
+
+    /* 种子行 */
+    var seedRow = document.createElement('div');
+    seedRow.className = 'cw-row';
+    seedRow.style.width = '310px';
+
+    var seedLabel = document.createElement('div');
+    seedLabel.className = 'cw-row-label';
+    seedLabel.setAttribute('data-i18n', 'selectWorld.enterSeed');
+    seedLabel.textContent = t('selectWorld.enterSeed');
+    seedRow.appendChild(seedLabel);
+
+    var seedInput = document.createElement('input');
+    seedInput.type = 'text';
+    seedInput.className = 'mc-input cw-input-308';
+    seedInput.value = state.seed;
+    seedInput.setAttribute('data-i18n-placeholder', 'selectWorld.seedInfo');
+    seedInput.setAttribute('placeholder', t('selectWorld.seedInfo'));
+    seedInput.setAttribute('autocomplete', 'off');
+    seedInput.setAttribute('spellcheck', 'false');
+    seedRow.appendChild(seedInput);
+
+    wrap.appendChild(seedRow);
+
+    seedInput.addEventListener('input', function() {
+      state.seed = seedInput.value;
+      state.onChanged();
+    });
+
+    /* SwitchGrid */
+    var gridWrap = document.createElement('div');
+    gridWrap.style.width = '310px';
+    gridWrap.style.marginTop = '4px';
+    wrap.appendChild(gridWrap);
+
+    var grid = new window.mcWidgets.SwitchGrid(310);
+    grid.add({
+      label: 'selectWorld.mapFeatures',
+      info:  'selectWorld.mapFeatures.info',
+      get:   function() { return state.generateStructures; },
+      set:   function(v) { state.generateStructures = v; state.onChanged(); },
+      activeWhen: function() { return !state.isDebug(); }
+    });
+    grid.add({
+      label: 'selectWorld.bonusItems',
+      get:   function() { return state.bonusChest; },
+      set:   function(v) { state.bonusChest = v; state.onChanged(); },
+      activeWhen: function() { return !state.isHardcore() && !state.isDebug(); }
+    });
+    gridWrap.appendChild(grid.el);
+
+    /* 状态监听 —— 含世界类型按钮同步（★ 修复） */
+    state.addListener(function() {
+      if (seedInput.value !== state.seed) seedInput.value = state.seed;
+
+      /* ★ 世界类型按钮同步：state 变了按钮没变时强制刷新 */
+      if (typeBtn.getValue() !== state.worldType) {
+        /* 若当前 value 不在按钮的 values 里（比如刚从 preset 页回来切到 flat 但按钮是 NORMAL 列表），
+           先扩大列表 */
+        if (typeBtn.values.indexOf(state.worldType) < 0) {
+          var extended = typeBtn.values.slice();
+          if (extended.indexOf(state.worldType) < 0) extended.push(state.worldType);
+          typeBtn.setValues(extended);
+        }
+        typeBtn.value = state.worldType;
+        typeBtn._updateLabel();
+      }
+
+      customizeBtn.disabled = !findPreset(state.worldType).editable;
+      grid.refreshStates();
+    });
+
+    customizeBtn.disabled = !findPreset(state.worldType).editable;
+  }
+
+  /* ==========================================================
+     More Tab
+     ========================================================== */
+  function buildMoreTab() {
+    var wrap = document.getElementById('cw-tab-more');
+    wrap.innerHTML = '';
+
+    function addTipBtn(key, tipTitle) {
+      var b = makeBtn('mcbtn-210');
+      b.setAttribute('data-i18n', key);
+      b.textContent = t(key);
+      b.addEventListener('click', function() {
+        window.mcDialog.alert({
+          title:   t(key),
+          message: tipTitle + ' is not available in the web edition.'
+        });
+      });
+      wrap.appendChild(b);
+    }
+
+    addTipBtn('selectWorld.gameRules', 'Game rules editing');
+    addTipBtn('selectWorld.experiments', 'Experiments');
+    addTipBtn('selectWorld.dataPacks', 'Data packs');
+  }
+
+  /* ==========================================================
+     Tab 系统
+     ========================================================== */
+  var tm, bar;
+  var tabAreaEl = document.getElementById('cw-tab-area');
+
+  function setupTabs() {
+    tm = new window.mcWidgets.TabManager();
+
+    var tabs = [
+      new window.mcWidgets.Tab({ title: 'createWorld.tab.game.title',  content: document.getElementById('cw-tab-game') }),
+      new window.mcWidgets.Tab({ title: 'createWorld.tab.world.title', content: document.getElementById('cw-tab-world') }),
+      new window.mcWidgets.Tab({ title: 'createWorld.tab.more.title',  content: document.getElementById('cw-tab-more') })
+    ];
+
+    bar = new window.mcWidgets.MenuTabBar(tm, { tabs: tabs });
+    document.getElementById('cw-tabbar-container').appendChild(bar.el);
+
+    resizeTabs();
+
+    var areaRect = tabAreaEl.getBoundingClientRect();
+    tm.setTabArea({ x: areaRect.left, y: 24, width: areaRect.width, height: areaRect.height });
+  }
+
+  function resizeTabs() {
+    var scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
+    var pageW = window.innerWidth / scale;
+    if (bar) bar.arrangeElements(pageW);
+  }
+
+  /* ==========================================================
+     底部按钮
+     ========================================================== */
+  var btnCreate = document.getElementById('cw-create');
+  var btnCancel = document.getElementById('cw-cancel');
+
+  function goBack() {
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('sstart.html');
+    } else {
+      location.href = 'sstart.html';
+    }
+  }
+
+  btnCancel.addEventListener('click', goBack);
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      goBack();
+    }
+  }, true);
+
+  /* ==========================================================
+     创建世界
+     ========================================================== */
+  function formatNow() {
+    var d = new Date();
+    var p = function(n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '/' + p(d.getMonth() + 1) + '/' + p(d.getDate())
+      + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function getInfoText() {
+    var m = GAME_MODES.filter(function(x) { return x.key === state.gameMode; })[0];
+    return (m ? t(m.displayKey) : state.gameMode) + ' Mode';
+  }
+
+  btnCreate.addEventListener('click', function() {
+    var worlds = loadWorlds();
+
+    var folder = state.targetFolder;
+    var base = folder;
+    var suffix = 1;
+    while (worlds.some(function(w) { return w.folder === folder; })) {
+      folder = base + ' (' + suffix + ')';
+      suffix++;
+    }
+
+    var newWorld = {
+      name:       state.name.trim() || t('selectWorld.newWorld', 'New World'),
+      folder:     folder,
+      lastPlayed: formatNow(),
+      info:       getInfoText(),
+      icon:       null,
+      join:       'join',
+      alert:      '',
+
+      gameMode:           state.gameMode,
+      difficulty:         state.difficulty,
+      allowCommands:      state.getAllowCommands(),
+      seed:               state.seed,
+      generateStructures: state.generateStructures,
+      bonusChest:         state.bonusChest,
+      worldType:          state.worldType,
+      flatPreset:         state.flatPreset || null,
+      flatPresetParsed:   state.flatPresetParsed || null,
+
+      onUpdate: function() {
+        var d = new Date();
+        var p = function(n) { return (n < 10 ? '0' : '') + n; };
+        this.lastPlayed = d.getFullYear() + '/' + p(d.getMonth() + 1) + '/' + p(d.getDate())
+          + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+      }
+    };
+
+    worlds.push(newWorld);
+    saveWorlds(worlds);
+
+    goBack();
+  });
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  function boot() {
+    buildGameTab();
+    buildWorldTab();
+    buildMoreTab();
+    setupTabs();
+
+    /* 从 preset_flat_world.html 返回 → 应用选中的超平坦定义 */
+    try {
+      var flatPreset = localStorage.getItem('mc_flat_preset');
+      var flatParsed = localStorage.getItem('mc_flat_preset_parsed');
+      if (flatPreset != null) {
+        localStorage.removeItem('mc_flat_preset');
+        localStorage.removeItem('mc_flat_preset_parsed');
+
+        state.flatPreset = flatPreset;
+        if (flatParsed) {
+          try { state.flatPresetParsed = JSON.parse(flatParsed); }
+          catch (e) {}
+        }
+
+        if (state.worldType !== 'flat') {
+          state.worldType = 'flat';
+        }
+      }
+    } catch (e) {}
+
+    state.onChanged();
+  }
+
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(boot);
+  } else {
+    boot();
+  }
+
+  window.addEventListener('resize', resizeTabs);
+
+})();
+</script>
+
+</body>
+</html>

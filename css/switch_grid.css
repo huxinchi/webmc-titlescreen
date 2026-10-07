@@ -1,0 +1,39 @@
+/* ==========================================================
+   SwitchGrid —— "标签 + 44×20 开关按钮"
+   对齐 SwitchGrid.java
+   按钮用 mcbtn-44（原版贴图 44×20）
+   ========================================================== */
+
+.mc-switch-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 310px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.mc-switch-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.mc-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+}
+
+.mc-switch-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: 'Minecraft', monospace;
+  font-size: var(--font-size, 10px);
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #3f3f3f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
