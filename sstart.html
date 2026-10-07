@@ -387,10 +387,24 @@ el.addEventListener('dblclick', function() {
   goWorldLoading(selected);
 });
 
-  btnEdit.addEventListener('click', function() {
-    if (!selected) return;
-    callHandle(selected, 'onEdit');
-  });
+btnEdit.addEventListener('click', function() {
+  if (!selected) return;
+
+  /* 优先 handle */
+  if (typeof selected.onEdit === 'function') {
+    try { selected.onEdit.call(selected); return; }
+    catch (e) { console.error('[world] onEdit', e); }
+  }
+
+  /* 无 handle → 跳编辑页 */
+  if (!selected.folder) return;
+  var url = 'edit_world.html?folder=' + encodeURIComponent(selected.folder);
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+});
 
   btnDelete.addEventListener('click', function() {
   if (!selected) return;

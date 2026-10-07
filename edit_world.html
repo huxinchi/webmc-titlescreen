@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Edit World</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  /* 逻辑坐标系 + 缩放 */
+  .edit-screen {
+    position: fixed; top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  /* 标题：centeredText(title, width/2, 15, -1) */
+  .edit-title {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  /* LinearLayout.vertical().spacing(5) */
+  .edit-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+  }
+
+  /* SpacerElement(200, 20) */
+  .edit-spacer {
+    width: 200px;
+    height: 20px;
+  }
+
+  /* StringWidget(NAME_LABEL).withStyle(GRAY) */
+  .edit-name-label {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1;
+    color: #AAAAAA;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    text-align: center;
+    user-select: none;
+  }
+
+  /* 200×20 长按钮 —— 复用 mcbtn-long */
+  .edit-layout .mcbtn-long {
+    width: 200px;
+  }
+
+  /* LinearLayout.horizontal().spacing(4) */
+  .edit-bottom-row {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+</style>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="edit-screen">
+
+  <div class="edit-title" id="edit-title">Edit World</div>
+
+  <div class="edit-layout">
+
+    <div class="edit-spacer"></div>
+
+    <div class="edit-name-label" id="edit-name-label">World Name</div>
+
+    <input class="mc-input" id="edit-name-input" type="text" autocomplete="off" spellcheck="false">
+
+    <button class="mcbtn mcbtn-long" id="btn-reset-icon"    type="button">Reset Icon</button>
+    <button class="mcbtn mcbtn-long" id="btn-open-folder"   type="button">Open Folder</button>
+    <button class="mcbtn mcbtn-long" id="btn-backup"        type="button">Backup</button>
+    <button class="mcbtn mcbtn-long" id="btn-backup-folder" type="button">Backup Folder</button>
+    <button class="mcbtn mcbtn-long" id="btn-optimize"      type="button">Optimize</button>
+
+    <div class="edit-spacer"></div>
+
+    <div class="edit-bottom-row">
+      <button class="mcbtn mcbtn-half" id="btn-save"   type="button">Save</button>
+      <button class="mcbtn mcbtn-half" id="btn-cancel" type="button">Cancel</button>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     i18n
+     ========================================================== */
+  var FALLBACKS = {
+    'selectWorld.edit.title':        'Edit World',
+    'selectWorld.enterName':         'World Name',
+    'selectWorld.edit.resetIcon':    'Reset Icon',
+    'selectWorld.edit.openFolder':   'Open Folder',
+    'selectWorld.edit.backup':       'Backup',
+    'selectWorld.edit.backupFolder': 'Backup Folder',
+    'selectWorld.edit.optimize':     'Optimize',
+    'selectWorld.edit.save':         'Save',
+    'gui.cancel':                    'Cancel',
+    'optimizeWorld.confirm.title':       'Optimize World',
+    'optimizeWorld.confirm.description': 'This will attempt to optimize the world, but may take a long time. Do you want to proceed?',
+    'optimizeWorld.confirm.proceed':     'Proceed'
+  };
+
+  function t(key, fallback) {
+    var v = (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+    if (v === key) {
+      if (FALLBACKS[key] != null) return FALLBACKS[key];
+      if (fallback != null) return fallback;
+    }
+    return v;
+  }
+
+  /* ==========================================================
+     参数
+     ========================================================== */
+  var params = new URLSearchParams(location.search);
+  var folder = params.get('folder') || '';
+
+  /* ==========================================================
+     序列化 / 反序列化（与 sstart.html 一致）
+     ========================================================== */
+  var STORAGE_KEY = 'mc_worlds';
+  var FN_KEY      = '__fn__';
+
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {};
+        out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) { console.warn('[edit_world] revive fn failed:', k, e); }
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadWorlds() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      var arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return [];
+      return deserialize(arr);
+    } catch (e) { return []; }
+  }
+
+  function saveWorlds(list) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(list)));
+    } catch (e) {}
+  }
+
+  /* ==========================================================
+     定位世界
+     ========================================================== */
+  var WORLDS = loadWorlds();
+  var world  = null;
+  for (var i = 0; i < WORLDS.length; i++) {
+    if (WORLDS[i] && WORLDS[i].folder === folder) { world = WORLDS[i]; break; }
+  }
+
+  /* 找不到 → 直接返回 */
+  if (!world) {
+    goBack();
+    return;
+  }
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var titleEl     = document.getElementById('edit-title');
+  var nameLabelEl = document.getElementById('edit-name-label');
+  var nameInput   = document.getElementById('edit-name-input');
+  var btnReset    = document.getElementById('btn-reset-icon');
+  var btnOpenFld  = document.getElementById('btn-open-folder');
+  var btnBackup   = document.getElementById('btn-backup');
+  var btnBackupF  = document.getElementById('btn-backup-folder');
+  var btnOptimize = document.getElementById('btn-optimize');
+  var btnSave     = document.getElementById('btn-save');
+  var btnCancel   = document.getElementById('btn-cancel');
+
+  /* ==========================================================
+     初始值
+     ========================================================== */
+  nameInput.value = world.name || '';
+
+  function isBlank(s) {
+    return !s || /^\s*$/.test(s);
+  }
+
+  function updateSaveState() {
+    btnSave.disabled = isBlank(nameInput.value);
+  }
+
+  function updateResetIconState() {
+    /* 原版：有 icon 文件才 active */
+    btnReset.disabled = !world.icon;
+  }
+
+  updateSaveState();
+  updateResetIconState();
+
+  /* ==========================================================
+     i18n 应用
+     ========================================================== */
+  function applyI18n() {
+    titleEl.textContent     = t('selectWorld.edit.title');
+    nameLabelEl.textContent = t('selectWorld.enterName');
+    btnReset.textContent    = t('selectWorld.edit.resetIcon');
+    btnOpenFld.textContent  = t('selectWorld.edit.openFolder');
+    btnBackup.textContent   = t('selectWorld.edit.backup');
+    btnBackupF.textContent  = t('selectWorld.edit.backupFolder');
+    btnOptimize.textContent = t('selectWorld.edit.optimize');
+    btnSave.textContent     = t('selectWorld.edit.save');
+    btnCancel.textContent   = t('gui.cancel');
+  }
+
+  applyI18n();
+  document.addEventListener('i18n-ready', applyI18n, false);
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(applyI18n);
+  }
+
+  /* ==========================================================
+     返回
+     ========================================================== */
+  function goBack() {
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('sstart.html');
+    } else {
+      location.href = 'sstart.html';
+    }
+  }
+
+  /* ==========================================================
+     输入响应
+     ========================================================== */
+  nameInput.addEventListener('input', updateSaveState);
+
+  /* ==========================================================
+     Save（Rename）
+     ========================================================== */
+  function doSave() {
+    var newName = nameInput.value;
+    if (isBlank(newName)) return;
+
+    for (var i = 0; i < WORLDS.length; i++) {
+      if (WORLDS[i] && WORLDS[i].folder === folder) {
+        WORLDS[i].name = newName;
+        break;
+      }
+    }
+    saveWorlds(WORLDS);
+
+    /* 对齐原版：callback.accept(true) 后回上一屏 */
+    goBack();
+  }
+
+  btnSave.addEventListener('click', doSave);
+
+  /* Enter 在输入框 → 保存并返回（对齐原版 keyPressed） */
+  nameInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      doSave();
+    }
+  });
+
+  /* ==========================================================
+     Cancel
+     ========================================================== */
+  btnCancel.addEventListener('click', goBack);
+
+  /* Esc → 返回（原版 Esc 走 onClose → callback.accept(false)） */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      goBack();
+    }
+  }, true);
+
+  /* ==========================================================
+     Reset Icon
+     ========================================================== */
+  btnReset.addEventListener('click', function() {
+    for (var i = 0; i < WORLDS.length; i++) {
+      if (WORLDS[i] && WORLDS[i].folder === folder) {
+        WORLDS[i].icon = null;
+        break;
+      }
+    }
+    world.icon = null;
+    saveWorlds(WORLDS);
+    updateResetIconState();
+  });
+
+  /* ==========================================================
+     Open Folder（网页版不支持）
+     ========================================================== */
+  btnOpenFld.addEventListener('click', function() {
+    window.mcDialog.alert({
+      title:   t('selectWorld.edit.openFolder'),
+      message: 'Opening the world folder is not available in the web edition.'
+    });
+  });
+
+  /* ==========================================================
+     Backup（网页版不支持，给一个"假装成功"）
+     ========================================================== */
+  btnBackup.addEventListener('click', function() {
+    window.mcDialog.alert({
+      title:   t('selectWorld.edit.backup'),
+      message: 'World backup is not available in the web edition.'
+    });
+  });
+
+  /* ==========================================================
+     Backup Folder（网页版不支持）
+     ========================================================== */
+  btnBackupF.addEventListener('click', function() {
+    window.mcDialog.alert({
+      title:   t('selectWorld.edit.backupFolder'),
+      message: 'Opening the backup folder is not available in the web edition.'
+    });
+  });
+
+  /* ==========================================================
+     Optimize —— 先弹确认框（对齐 BackupConfirmScreen 的语义）
+     Yes 后再弹"网页版不支持"
+     ========================================================== */
+  btnOptimize.addEventListener('click', function() {
+    var title   = t('optimizeWorld.confirm.title');
+    var message = t('optimizeWorld.confirm.description');
+
+    window.mcDialog.confirm({
+      title:   title,
+      message: message,
+      yesText: t('optimizeWorld.confirm.proceed'),
+      noText:  t('gui.cancel'),
+      onYes: function() {
+        window.mcDialog.alert({
+          title:   title,
+          message: 'World optimization is not available in the web edition.'
+        });
+      }
+    });
+  });
+
+  /* ==========================================================
+     聚焦输入框
+     ========================================================== */
+  try { nameInput.focus(); } catch (e) {}
+
+})();
+</script>
+
+</body>
+</html>
