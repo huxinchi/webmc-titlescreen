@@ -220,15 +220,27 @@
        前进：把当前页压栈 + 跳到 target（带 fromurl 传递）
        用于 <button> 手动监听场景
        ======================================================== */
-    jump: function(target) {
-      if (!target) return;
-      /* ★ 保留 target 上的查询参数 */
-      var base = target;
-      var s = readStack();
-      s.push(currentPage());
-      location.href = updateFromUrl(base, s);
-    }
-  };
+  jump: function(target) {
+    if (!target) return;
+    /* ★ 保留 target 上的查询参数 */
+    var base = target;
+    var s = readStack();
+    s.push(currentPage());
+    location.href = updateFromUrl(base, s);
+  },
+
+  /* ========================================================
+     前进：**不**把当前页压栈，仅保留现有 fromurl 栈
+     用于中间页（connecting 等）—— 避免返回时跳回中间页
+     等价于 <a class="btn-jmp"> 的语义
+     ======================================================== */
+  jumpNoPush: function(target) {
+    if (!target) return;
+    var s = readStack();
+    location.href = updateFromUrl(target, s);
+  }
+};
+ 
 
   /* ==========================================================
      启动

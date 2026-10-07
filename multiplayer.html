@@ -111,12 +111,58 @@
   'use strict';
 
   var STORAGE_KEY     = 'mc_servers';
-  var STORAGE_VERSION = 7;
+  var STORAGE_VERSION = 8;
   var VERSION_KEY     = 'mc_servers_version';
   var FN_KEY          = '__fn__';
 
   /* LAN 世界重现延迟上限（毫秒） */
   var LAN_REJOIN_MAX_MS = 1800;
+
+  /* ==========================================================
+     连接阶段默认时长（毫秒），可被 server.stages 覆盖
+     ========================================================== */
+ /* ==========================================================
+   连接阶段默认配置
+   - duration >= 0 → 正常等待
+   - duration === -1 → 立即失败，用 error 作为断连原因
+     （必须配 error；缺失则回落 DEFAULT_ERROR）
+   - error 里若含 %s，connecting.html 会替换成服务器地址
+   ========================================================== */
+var DEFAULT_ERROR =
+  'io.netty.channel.AbstractChannel$AnnotatedConnectException: ' +
+  'Connection refused: no further information: %s';
+
+/* 有 onJoin → 走完整时序 */
+var NORMAL_STAGES = [
+  { key: 'connect.connecting',  duration: 800 },
+  { key: 'connect.authorizing', duration: 600 },
+  { key: 'connect.encrypting',  duration: 400 },
+  { key: 'connect.joining',     duration: 600 }
+];
+
+/* 无 onJoin → 立即在 connecting 阶段失败 */
+/* 无 onJoin → connecting 停留一段后，进入 authorizing 时立即失败 */
+var FAIL_STAGES = [
+  { key: 'connect.connecting',  duration: 800 },
+  { key: 'connect.authorizing', duration: -1, error: DEFAULT_ERROR }
+];
+
+function getStagesFor(server) {
+  /* 1. 显式 stages 优先 */
+  if (server && Array.isArray(server.stages) && server.stages.length) {
+    return server.stages;
+  }
+  /* 2. 有 onJoin → 正常时序 */
+  if (server && typeof server.onJoin === 'function') {
+    return NORMAL_STAGES;
+  }
+  /* 3. 无 onJoin → 立即失败 */
+  return FAIL_STAGES;
+}
+/* JSON 编码：会带上 error 字段，URLSearchParams 会再包一层 encodeURIComponent */
+function encodeStages(stages) {
+  return JSON.stringify(stages);
+}
 
   /* ==========================================================
      普通服务器 —— 存 localStorage，可增删改
@@ -157,72 +203,80 @@
   ];
 
   /* ==========================================================
-     LAN 候选池 —— 每次刷新时全部清空，
-     每个条目独立随机 0~LAN_REJOIN_MAX_MS 延迟后重新出现。
+     LAN 候选池 —— 现在也持久化进 mc_servers（type: 'lan'）
+     - id 用于去重 / 编辑定位
+     - type: 'lan' 用于渲染时与普通服务器区分
      ========================================================== */
   var LAN_SERVERS = [
     {
+      id:      'lan_192.168.1.10',
+      type:    'lan',
       address: '192.168.1.10:25565',
-      motd: '§eA local world',
-      onJoin: function() { alert('join LAN World'); }
+      motd:    '§eA local world',
+      onJoin:  function() { alert('join LAN World'); }
     },
     {
+      id:      'lan_192.168.1.42',
+      type:    'lan',
       address: '192.168.1.42:25565',
-      motd: '§7Another local world'
+      motd:    '§7Another local world'
       /* 无 onJoin —— 出现时也是不可连接的（走断连页） */
     }
   ];
 
-  var lanVisible = [];
-  var lanTimers  = [];
-
-  function getVisibleLanServers() {
-    return lanVisible.slice();
-  }
+  /* 当前可见的 LAN id 集合 */
+  var lanVisibleIds = {};
+  var lanTimers     = [];
 
   /* ==========================================================
      应用 preset —— 地址命中就覆盖动态字段
      - 保留本地 id / name（用户自定义不被覆盖）
-     - 覆盖 onJoin / onEdit / onDelete / motd / players /
-       playerList / ping / version / type / icon
-     - 未命中 → 把动态字段清干净（防止旧数据残留）
+     - 未命中 → 清掉可能残留的动态字段
+     - LAN 条目不走 preset（它们有自己的 onJoin / motd）
      ========================================================== */
   function applyPresetToServer(s) {
-    if (!s || s._isLan || s.type === 'lan') return false;
+    if (!s || s.type === 'lan' || s._isLan) return false;
 
     var addr = s.ip || s.address || s.name || '';
     var m = window.mcMatchPreset ? window.mcMatchPreset(addr) : null;
 
-    if (!m || !m.preset) {
-      /* 未命中 → 清掉所有可能残留的动态字段 */
-      delete s.onJoin;
-      delete s.onEdit;
-      delete s.onDelete;
-      delete s.motd;
-      delete s.players;
-      delete s.playerList;
-      delete s.ping;
-      delete s.version;
-      s.type = s.type || 'other';
-      return false;
-    }
+if (!m || !m.preset) {
+  delete s.onJoin;
+  delete s.onEdit;
+  delete s.onDelete;
+  delete s.motd;
+  delete s.players;
+  delete s.playerList;
+  delete s.ping;
+  delete s.version;
+  delete s.stages;              /* ★ 清掉旧 stages，回落到默认 */
+  s.type = s.type || 'other';
+  return false;
+}
 
     var p = m.preset;
 
     s.onJoin   = p.onJoin;
     s.onEdit   = p.onEdit;
     s.onDelete = p.onDelete;
-
     s.motd       = p.motd;
     s.players    = p.players;
     s.playerList = p.playerList;
     s.ping       = p.ping;
     s.version    = p.version;
-    s.type       = p.type || 'other';
-    if (p.icon != null) s.icon = p.icon;
+  s.type       = p.type || 'other';
+  if (p.icon != null) s.icon = p.icon;
 
-    return true;
+  /* ★ preset 若带 stages → 覆盖；不带则用默认 */
+  if (p.stages && p.stages.length) {
+    s.stages = p.stages;
+  } else {
+    delete s.stages;
   }
+
+  return true;
+}
+  
 
   /* ==========================================================
      序列化 / 反序列化（支持函数）
@@ -267,8 +321,19 @@
   }
 
   /* ==========================================================
-     loadServers —— 读 localStorage 后立刻应用 preset
-     让页面 0ms 起就有正确的 onJoin / motd / players 等字段
+     把 LAN 定义重新合并进 SERVERS
+     - 移除旧 LAN（避免持久化数据污染）
+     - 从 LAN_SERVERS 定义里重新加入（始终用最新定义）
+     ========================================================== */
+  function mergeLanInto(list) {
+    var out = list.filter(function(s) { return s && s.type !== 'lan'; });
+    LAN_SERVERS.forEach(function(lan) { out.push(lan); });
+    return out;
+  }
+
+  /* ==========================================================
+     loadServers
+     - 读 localStorage 后：应用 preset + 合并 LAN 定义
      ========================================================== */
   function loadServers() {
     try {
@@ -279,25 +344,27 @@
       }
     } catch (e) {}
 
+    var list = null;
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         var arr = JSON.parse(raw);
         if (Array.isArray(arr)) {
-          var list = deserialize(arr);
+          list = deserialize(arr);
           list.forEach(function(s) {
             s.status = 'successful';
-            applyPresetToServer(s);   /* ★ 加载后立即应用 */
+            applyPresetToServer(s);
           });
-          return list;
         }
       }
     } catch (e) {}
 
-    saveServers(DEFAULT_SERVERS);
-    var fresh = DEFAULT_SERVERS.slice();
-    fresh.forEach(function(s) { applyPresetToServer(s); });
-    return fresh;
+    if (!list) {
+      list = DEFAULT_SERVERS.slice();
+      list.forEach(function(s) { applyPresetToServer(s); });
+    }
+
+    return mergeLanInto(list);
   }
 
   function saveServers(list) {
@@ -308,13 +375,28 @@
 
   /* ==========================================================
      是否可连 —— 只看 onJoin
-     （applyPresetToServer 已在加载 / 结算阶段保证字段正确）
      ========================================================== */
   function hasJoinHandle(s) {
     return typeof s.onJoin === 'function';
   }
 
   var SERVERS = loadServers();
+
+  /* 首次加载后就把合并结果写回 localStorage */
+  saveServers(SERVERS);
+
+  /* ==========================================================
+     视图筛选
+     ========================================================== */
+  function getNormalServers() {
+    return SERVERS.filter(function(s) { return s && s.type !== 'lan'; });
+  }
+
+  function getVisibleLanServers() {
+    return SERVERS.filter(function(s) {
+      return s && s.type === 'lan' && lanVisibleIds[s.id];
+    });
+  }
 
   /* ==========================================================
      DOM
@@ -337,64 +419,80 @@
       joinServerFromList(server);
     },
 
+    /* 排序只对普通服务器生效 */
     onMoveUp: function(server, index) {
       if (index <= 0) return;
-      var tmp = SERVERS[index - 1];
-      SERVERS[index - 1] = SERVERS[index];
-      SERVERS[index] = tmp;
+      var normals = getNormalServers();
+      var tmp = normals[index - 1];
+      normals[index - 1] = normals[index];
+      normals[index] = tmp;
+
+      var lans = SERVERS.filter(function(s) { return s.type === 'lan'; });
+      SERVERS.length = 0;
+      normals.forEach(function(s) { SERVERS.push(s); });
+      lans.forEach(function(s) { SERVERS.push(s); });
+
       saveServers(SERVERS);
       refreshListUI();
     },
 
     onMoveDown: function(server, index) {
-      if (index >= SERVERS.length - 1) return;
-      var tmp = SERVERS[index + 1];
-      SERVERS[index + 1] = SERVERS[index];
-      SERVERS[index] = tmp;
+      var normals = getNormalServers();
+      if (index >= normals.length - 1) return;
+
+      var tmp = normals[index + 1];
+      normals[index + 1] = normals[index];
+      normals[index] = tmp;
+
+      var lans = SERVERS.filter(function(s) { return s.type === 'lan'; });
+      SERVERS.length = 0;
+      normals.forEach(function(s) { SERVERS.push(s); });
+      lans.forEach(function(s) { SERVERS.push(s); });
+
       saveServers(SERVERS);
       refreshListUI();
     }
   });
 
   /* ==========================================================
-     统一渲染入口 —— 普通 + 当前可见的 LAN 一起设
+     统一渲染入口
      ========================================================== */
   function refreshListUI() {
-    list.setServers(SERVERS);
+    list.setServers(getNormalServers());
     list.setLanServers(getVisibleLanServers());
   }
 
   /* ==========================================================
-     刷新 LAN —— 清空 + 各自随机延迟重现
+     刷新 LAN —— 清空 + 各自随机 0~LAN_REJOIN_MAX_MS 后重现
      ========================================================== */
   function refreshLanServers() {
     lanTimers.forEach(function(id) { clearTimeout(id); });
     lanTimers = [];
 
-    lanVisible = [];
+    lanVisibleIds = {};
     list.setLanServers([]);
 
     var sel = list.getSelected();
-    if (sel && sel._isLan) {
+    if (sel && sel.type === 'lan') {
       list.clearSelected();
       updateButtonState(null);
     }
 
-    LAN_SERVERS.forEach(function(s) {
+    SERVERS.forEach(function(s) {
+      if (s.type !== 'lan') return;
       var delay = Math.floor(Math.random() * LAN_REJOIN_MAX_MS);
-      var id = setTimeout(function() {
-        lanVisible.push(s);
+      var tid = setTimeout(function() {
+        lanVisibleIds[s.id] = true;
         list.setLanServers(getVisibleLanServers());
       }, delay);
-      lanTimers.push(id);
+      lanTimers.push(tid);
     });
   }
 
   /* ==========================================================
      连接服务器
-       1. presets 命中且有 onJoin → 用 preset
-       2. 列表条目自带 onJoin     → 用它
-       3. 都没有                  → 断连页
+       1. 无 handle（既无 preset 也无 onJoin）→ 断连页
+       2. 有 handle → 连接页走状态机
      ========================================================== */
   function joinServerFromList(sel) {
     if (!sel) return;
@@ -403,17 +501,34 @@
     var addr = sel.ip || sel.address || sel.name || '';
 
     var m = window.mcMatchPreset ? window.mcMatchPreset(addr) : null;
-    if (m && typeof m.preset.onJoin === 'function') {
-      try { m.preset.onJoin.call(m.preset); return; }
-      catch (e) { console.error('[multiplayer] preset.onJoin', e); }
+    var hasPreset = !!(m && typeof m.preset.onJoin === 'function');
+    var hasLocal  = typeof sel.onJoin === 'function';
+
+    if (!hasPreset && !hasLocal) {
+      showDisconnected(addr);
+      return;
     }
 
-    if (typeof sel.onJoin === 'function') {
-      try { sel.onJoin.call(sel); return; }
-      catch (e) { console.error('[multiplayer] onJoin', e); }
-    }
+    showConnecting(sel, addr);
+  }
 
-    showDisconnected(addr);
+  /* ==========================================================
+     跳转连接页 —— 阶段配置字符串化后走参数
+     ========================================================== */
+  function showConnecting(sel, addr) {
+    var qs = [];
+    if (sel.id) qs.push('id='   + encodeURIComponent(sel.id));
+    if (addr)   qs.push('addr=' + encodeURIComponent(addr));
+
+    var stages = getStagesFor(sel);
+    qs.push('stages=' + encodeURIComponent(encodeStages(stages)));
+
+    var url = 'connecting.html' + (qs.length ? '?' + qs.join('&') : '');
+    if (window.mcBack && typeof window.mcBack.jump === 'function') {
+      window.mcBack.jump(url);
+    } else {
+      location.href = url;
+    }
   }
 
   /* ==========================================================
@@ -437,7 +552,7 @@
      ========================================================== */
   function updateButtonState(server) {
     var isLanHeader = !!server && server._isLanHeader;
-    var isLanEntry  = !!server && (server._isLan || server.type === 'lan');
+    var isLanEntry  = !!server && server.type === 'lan';
     var editable    = !!server && !isLanHeader && !isLanEntry;
 
     btnSelect.disabled = !server || isLanHeader;
@@ -463,7 +578,7 @@
 
   btnEdit.addEventListener('click', function() {
     var sel = list.getSelected();
-    if (!sel || sel._isLanHeader || sel._isLan || sel.type === 'lan') return;
+    if (!sel || sel._isLanHeader || sel.type === 'lan') return;
 
     if (typeof sel.onEdit === 'function') {
       try { sel.onEdit.call(sel); return; } catch (e) { console.error('[multiplayer] onEdit', e); }
@@ -477,28 +592,26 @@
     }
   });
 
+  /* Delete —— 无 onDelete 就走确认页 */
   btnDelete.addEventListener('click', function() {
-  var sel = list.getSelected();
-  if (!sel) return;
-  if (sel._isLanHeader || sel._isLan || sel.type === 'lan') return;
+    var sel = list.getSelected();
+    if (!sel || sel._isLanHeader || sel.type === 'lan') return;
 
-  /* 有自定义 onDelete → 走它 */
-  if (typeof sel.onDelete === 'function') {
-    try { sel.onDelete.call(sel); return; }
-    catch (e) { console.error('[multiplayer] onDelete', e); }
-  }
+    if (typeof sel.onDelete === 'function') {
+      try { sel.onDelete.call(sel); return; }
+      catch (e) { console.error('[multiplayer] onDelete', e); }
+    }
 
-  /* 否则进删除确认页 */
-  var target = 'delete_server.html?id=' + encodeURIComponent(sel.id || '');
-  if (window.mcBack && typeof window.mcBack.jump === 'function') {
-    window.mcBack.jump(target);
-  } else {
-    location.href = target;
-  }
-});
+    var target = 'delete_server.html?id=' + encodeURIComponent(sel.id || '');
+    if (window.mcBack && typeof window.mcBack.jump === 'function') {
+      window.mcBack.jump(target);
+    } else {
+      location.href = target;
+    }
+  });
 
   /* ==========================================================
-     i18n 就绪后重新渲染一次
+     i18n 就绪后重新渲染
      ========================================================== */
   if (window.i18n && window.i18n.ready) {
     window.i18n.ready(function() { refreshListUI(); });
@@ -507,14 +620,6 @@
 
   /* ==========================================================
      Refresh / F5
-     流程：
-       1. 取消旧 timer，恢复状态
-       2. 普通服务器：全部标 pinging → 渲染
-       3. LAN：清空 → 每个随机 0~1800ms 后重现
-       4. 1 秒后结算普通服务器：
-          - applyPresetToServer（幂等，值不变）
-          - 未命中 preset → 跑本地 onUpdate
-          - status = onJoin 存在 ? successful : unreachable
      ========================================================== */
   var refreshTimer = null;
 
@@ -529,35 +634,28 @@
       });
     }
 
-    /* 普通服务器 → pinging */
     SERVERS.forEach(function(s) {
+      if (s.type === 'lan') return;
       s._origStatus = s.status || 'successful';
       s.status = 'pinging';
     });
     refreshListUI();
 
-    /* LAN → 清空 + 各自随机延迟重现 */
     refreshLanServers();
 
-    /* 1 秒后结算普通服务器 */
     refreshTimer = setTimeout(function() {
       SERVERS.forEach(function(s) {
-        /* 1. 幂等地再跑一次 preset 应用（保险） */
-        var applied = applyPresetToServer(s);
+        if (s.type === 'lan') return;
 
-        /* 2. 未命中 preset 才跑本地 onUpdate */
+        var applied = applyPresetToServer(s);
         if (!applied && typeof s.onUpdate === 'function') {
           try { s.onUpdate.call(s); } catch (e) { console.error('[server] onUpdate', e); }
         }
-
-        /* 3. 结算状态 */
         s.status = hasJoinHandle(s) ? 'successful' : 'unreachable';
         delete s._origStatus;
       });
 
-      /* 4. 落盘，让 preset 数据下次打开直接用 */
       saveServers(SERVERS);
-
       refreshListUI();
       refreshTimer = null;
     }, 1000);
@@ -578,12 +676,13 @@
      对外 API
      ========================================================== */
   window.mcMultiplayer = {
-    getServers:     function() { return SERVERS; },
+    getServers:     function() { return getNormalServers(); },
     getLanServers:  function() { return getVisibleLanServers(); },
     saveServers:    function() { saveServers(SERVERS); },
     refreshList:    function() { refreshListUI(); updateButtonState(null); },
 
     removeServer: function(s) {
+      if (!s || s.type === 'lan') return;
       var idx = SERVERS.indexOf(s);
       if (idx >= 0) SERVERS.splice(idx, 1);
       saveServers(SERVERS);
@@ -592,8 +691,13 @@
     },
 
     addServer: function(s) {
-      applyPresetToServer(s);      /* ★ 加入前先应用 preset */
-      SERVERS.push(s);
+      applyPresetToServer(s);
+      var firstLanIdx = -1;
+      for (var i = 0; i < SERVERS.length; i++) {
+        if (SERVERS[i].type === 'lan') { firstLanIdx = i; break; }
+      }
+      if (firstLanIdx >= 0) SERVERS.splice(firstLanIdx, 0, s);
+      else SERVERS.push(s);
       saveServers(SERVERS);
       refreshListUI();
       updateButtonState(null);
@@ -630,8 +734,18 @@
       var preset = (window.mcServerPresets || {})[info.preset];
 
       if (preset && typeof preset.onJoin === 'function') {
-        try { preset.onJoin.call(preset); return; }
-        catch (err) { console.error('[multiplayer] preset.onJoin', err); }
+        /* 走连接页 */
+        var qs = ['addr=' + encodeURIComponent(addr)];
+        var stages = getStagesFor(preset);
+        qs.push('stages=' + encodeURIComponent(encodeStages(stages)));
+        var url = 'connecting.html?' + qs.join('&');
+
+        if (window.mcBack && typeof window.mcBack.jump === 'function') {
+          window.mcBack.jump(url);
+        } else {
+          location.href = url;
+        }
+        return;
       }
 
       showDisconnected(addr);
@@ -639,7 +753,7 @@
   })();
 
   /* ==========================================================
-     启动 —— refreshServerList 内部会清空 LAN 并各自随机重现
+     启动
      ========================================================== */
   refreshServerList(true);
 

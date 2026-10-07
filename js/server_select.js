@@ -470,17 +470,12 @@
 
   ServerSelectionList.prototype.getSelected = function() { return this.selected; };
 
-  ServerSelectionList.prototype._fireJoin = function(server) {
-    if (server && typeof server.onJoin === 'function') {
-      try { server.onJoin.call(server); } catch (e) { console.error('[server] onJoin', e); }
-      return;
-    }
-    if (typeof this.onJoin === 'function') this.onJoin(server);
-  };
-
-  ServerSelectionList.prototype._fireMoveUp = function(server, index) {
-    if (typeof this.onMoveUp === 'function') this.onMoveUp(server, index);
-  };
+/* 箭头右半区 / 双击 → 统一走列表的 onJoin 回调（multiplayer 会跳 connecting.html） */
+ServerSelectionList.prototype._fireJoin = function(server) {
+  if (typeof this.onJoin === 'function') {
+    this.onJoin(server);
+  }
+};
 
   ServerSelectionList.prototype._fireMoveDown = function(server, index) {
     if (typeof this.onMoveDown === 'function') this.onMoveDown(server, index);

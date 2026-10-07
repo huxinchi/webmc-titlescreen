@@ -32,7 +32,6 @@
     position: relative;
   }
 
-  /* 逻辑坐标系容器（对齐 Screen 的 width/height） */
   .connect-screen {
     position: fixed;
     top: 0; left: 50%;
@@ -45,7 +44,6 @@
     pointer-events: none;
   }
 
-  /* graphics.centeredText(font, status, width/2, height/2 - 50) */
   .connect-status {
     position: absolute;
     left: 50%;
@@ -63,7 +61,6 @@
     text-overflow: ellipsis;
   }
 
-  /* Button.bounds(width/2 - 100, height/4 + 120 + 12, 200, 20) */
   .connect-screen #btn-cancel {
     pointer-events: auto;
     position: absolute;
@@ -98,26 +95,13 @@
   'use strict';
 
   /* ==========================================================
-     阶段定义 —— 对齐 ClientHandshakePacketListenerImpl.State
-       CONNECTING    → connect.connecting
-       AUTHORIZING   → connect.authorizing
-       ENCRYPTING    → connect.encrypting
-       JOINING       → connect.joining
-
-     connect.negotiating 在原版中是 handleCustomQuery 单独 updateStatus，
-     生命周期夹在 AUTHORIZING 和 ENCRYPTING 之间，这里作为可选阶段，
-     需要就把它插在 ENCRYPTING 前。
-
-     duration：该阶段停留毫秒数（可自由调整）
+     参数
      ========================================================== */
-  var STAGES = [
-    { key: 'connect.connecting',  duration: 800 },
-    { key: 'connect.authorizing', duration: 600 },
-    { key: 'connect.encrypting',  duration: 400 },
-    { key: 'connect.joining',     duration: 600 }
-  ];
+  var params = new URLSearchParams(location.search);
+  var id     = params.get('id')   || '';
+  var addr   = params.get('addr') || '';
 
-  /* i18n 缺失时的 fallback（对齐 en_us.json） */
+  /* i18n 缺失时的 fallback */
   var FALLBACKS = {
     'connect.connecting':  'Connecting to the server...',
     'connect.authorizing': 'Logging in...',
@@ -128,8 +112,6 @@
     'gui.cancel':          'Cancel'
   };
 
-  var FN_KEY = '__fn__';
-
   function t(key) {
     var v = (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
     if (v === key && FALLBACKS[key] != null) return FALLBACKS[key];
@@ -137,9 +119,70 @@
   }
 
   /* ==========================================================
-     反序列化 —— 恢复 localStorage 里的函数字段
-     与 multiplayer.html 里的 serialize / deserialize 配对
+     阶段配置
      ========================================================== */
+var DEFAULT_ERROR =
+  'io.netty.channel.AbstractChannel$AnnotatedConnectException: ' +
+  'Connection refused: no further information: %s';
+
+/* 无 URL 参数时的兜底 —— 与 multiplayer 的 FAIL_STAGES 保持一致 */
+var DEFAULT_STAGES = [
+  { key: 'connect.connecting',  duration: 800 },
+  { key: 'connect.authorizing', duration: -1, error: DEFAULT_ERROR }
+];
+
+/* 归一化一个 stage 项 */
+function normalizeStage(item) {
+  if (!item || typeof item.key !== 'string') return null;
+  var dur = Number(item.duration);
+  if (!isFinite(dur)) return null;
+
+  var err = (typeof item.error === 'string' && item.error) ? item.error : null;
+  /* duration === -1 必须带 error，缺失则回落默认 */
+  if (dur === -1 && !err) err = DEFAULT_ERROR;
+
+  return { key: item.key, duration: dur, error: err };
+}
+
+/* JSON 解析（带旧格式兜底："key:duration,key:duration"） */
+function decodeStages(str) {
+  if (!str) return null;
+  var arr = null;
+
+  /* 1. 尝试 JSON */
+  try {
+    var parsed = JSON.parse(str);
+    if (Array.isArray(parsed)) arr = parsed;
+  } catch (e) {}
+
+  /* 2. JSON 失败 → 旧格式兜底 */
+  if (!arr && str.indexOf(',') >= 0) {
+    arr = str.split(',').map(function(part) {
+      var idx = part.lastIndexOf(':');
+      if (idx <= 0) return null;
+      return {
+        key: part.substring(0, idx).trim(),
+        duration: parseFloat(part.substring(idx + 1))
+      };
+    }).filter(Boolean);
+  }
+
+  if (!arr) return null;
+
+  var out = [];
+  arr.forEach(function(item) {
+    var s = normalizeStage(item);
+    if (s) out.push(s);
+  });
+  return out.length ? out : null;
+}
+
+var STAGES = decodeStages(params.get('stages')) || DEFAULT_STAGES;
+  /* ==========================================================
+     反序列化 —— 与 multiplayer.html 的 serialize 配对
+     ========================================================== */
+  var FN_KEY = '__fn__';
+
   function deserialize(obj) {
     if (Array.isArray(obj)) return obj.map(deserialize);
     if (!obj || typeof obj !== 'object') return obj;
@@ -159,20 +202,25 @@
   }
 
   /* ==========================================================
-     参数
+     地址归一化
      ========================================================== */
-  var params = new URLSearchParams(location.search);
-  var id     = params.get('id')   || '';
-  var addr   = params.get('addr') || '';
+  function normAddr(a) {
+    a = String(a || '').trim().toLowerCase();
+    if (!a) return '';
+    if (a.indexOf(':') < 0) a += ':25565';
+    return a;
+  }
 
   /* ==========================================================
      找 join 目标
-       1. presets 按地址命中 → 用 preset（this 指向 preset）
-       2. localStorage 里按 id 找到 server → 用 server（this 指向 server）
-       3. 都没有 → null（调用方决定跳 disconnected）
+       1. presets 按 addr 命中
+       2. mc_servers 里按 id 或按 addr 搜（含 LAN）
+       3. 都没有 → null
      ========================================================== */
   function resolveJoinTarget() {
-    /* 1. presets */
+    var a1 = normAddr(addr);
+
+    /* 1. presets 优先 */
     if (addr && window.mcMatchPreset) {
       var m = window.mcMatchPreset(addr);
       if (m && m.preset && typeof m.preset.onJoin === 'function') {
@@ -180,32 +228,47 @@
       }
     }
 
-    /* 2. localStorage 里的 server（按 id 匹配） */
-    if (id) {
-      try {
-        var raw = localStorage.getItem('mc_servers');
-        if (raw) {
-          var arr = JSON.parse(raw);
-          if (Array.isArray(arr)) {
-            for (var i = 0; i < arr.length; i++) {
-              if (arr[i] && arr[i].id === id) {
-                var s = deserialize(arr[i]);
-                /* 若地址也能命中 preset，优先用 preset */
-                var a2 = s.ip || s.address || s.name || '';
-                if (a2 && window.mcMatchPreset) {
-                  var m2 = window.mcMatchPreset(a2);
-                  if (m2 && m2.preset && typeof m2.preset.onJoin === 'function') {
-                    return m2.preset;
-                  }
-                }
-                if (typeof s.onJoin === 'function') return s;
-                break;
+    /* 2. mc_servers 里搜 */
+    try {
+      var raw = localStorage.getItem('mc_servers');
+      if (raw) {
+        var arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          var byId   = null;
+          var byAddr = null;
+
+          for (var i = 0; i < arr.length; i++) {
+            var e = arr[i];
+            if (!e) continue;
+
+            if (!byId && id && e.id === id) {
+              byId = e;
+            }
+            if (!byAddr && a1) {
+              var ea = normAddr(e.ip || e.address || e.name || '');
+              if (ea && ea === a1) byAddr = e;
+            }
+            if (byId && byAddr) break;
+          }
+
+          var picked = byId || byAddr;
+          if (picked) {
+            var s = deserialize(picked);
+
+            /* 兜底：拿到条目后若地址还能命中 preset → 用 preset */
+            var a2 = s.ip || s.address || s.name || '';
+            if (a2 && window.mcMatchPreset) {
+              var m2 = window.mcMatchPreset(a2);
+              if (m2 && m2.preset && typeof m2.preset.onJoin === 'function') {
+                return m2.preset;
               }
             }
+
+            if (typeof s.onJoin === 'function') return s;
           }
         }
-      } catch (e) {}
-    }
+      }
+    } catch (e) {}
 
     return null;
   }
@@ -213,12 +276,10 @@
   /* ==========================================================
      DOM
      ========================================================== */
-  var statusEl  = document.getElementById('connect-status');
-  var cancelEl  = document.getElementById('btn-cancel');
+  var statusEl = document.getElementById('connect-status');
+  var cancelEl = document.getElementById('btn-cancel');
 
-  /* 状态文字随 i18n 就绪后自动更新 —— 用 MutationObserver 不必要，
-     直接监听 i18n-ready 重新应用当前 key 即可 */
-  var currentKey = STAGES[0].key;
+  var currentKey = STAGES.length ? STAGES[0].key : 'connect.connecting';
 
   function applyStatus() {
     statusEl.textContent = t(currentKey);
@@ -233,54 +294,84 @@
   var stageIndex = 0;
   var aborted    = false;
 
-  function advanceStage() {
-    if (aborted) return;
+function advanceStage() {
+  if (aborted) return;
 
-    if (stageIndex >= STAGES.length) {
-      finish();
-      return;
-    }
-
-    var stage = STAGES[stageIndex];
-    stageIndex++;
-
-    currentKey = stage.key;
-    applyStatus();
-
-    stageTimer = setTimeout(advanceStage, stage.duration);
+  if (stageIndex >= STAGES.length) {
+    finish();
+    return;
   }
+
+  var stage = STAGES[stageIndex];
+  stageIndex++;
+
+  currentKey = stage.key;
+  applyStatus();
+
+  /* duration === -1 → 立即中断，跳断连页 */
+  if (stage.duration === -1) {
+    abortWithError(stage.error || DEFAULT_ERROR);
+    return;
+  }
+
+  stageTimer = setTimeout(advanceStage, stage.duration);
+}
+
+/* 把 error 里的 %s 替换成 addr（缺失则用原始 error） */
+function expandError(err, addr) {
+  if (!err) return '';
+  var target = addr || 'localhost:25565';
+  return err.indexOf('%s') >= 0 ? err.replace('%s', target) : err;
+}
+
+/* 中断：跳 disconnected，带 reason */
+/* 中断：跳 disconnected，带 reason
+   ★ 用 jumpNoPush —— 不把 connecting 压进栈，
+     否则 disconnected 的 Back 会弹回 connecting */
+function abortWithError(err) {
+  if (aborted) return;
+  aborted = true;
+  if (stageTimer) clearTimeout(stageTimer);
+
+  var reason = expandError(err, addr);
+  var url = 'disconnected.html?server=' + encodeURIComponent(addr || 'localhost:25565')
+          + '&reason=' + encodeURIComponent(reason);
+
+  if (window.mcBack && typeof window.mcBack.jumpNoPush === 'function') {
+    window.mcBack.jumpNoPush(url);
+  } else if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+}
 
   /* ==========================================================
-     结束 —— 调用 onJoin
-     - 成功 → 执行 target.onJoin（this = target）
-     - 未找到 target → 回落 disconnected
-     - onJoin 抛错 → 回落 disconnected
+     结束 —— 调 onJoin
      ========================================================== */
-  function finish() {
-    if (aborted) return;
+function finish() {
+  if (aborted) return;
 
-    var target = resolveJoinTarget();
+  var target = resolveJoinTarget();
 
-    if (!target) {
-      /* 无 handle：跳断连页 */
-      goDisconnected();
-      return;
-    }
-
-    try {
-      target.onJoin.call(target);
-    } catch (e) {
-      console.error('[connecting] onJoin', e);
-      goDisconnected();
-      return;
-    }
-
-    /* onJoin 一般会自己跳走或弹 alert。如果它没跳（比如只是 alert），
-       给用户一点时间看提示，然后自动回到 multiplayer */
-    setTimeout(function() {
-      if (!aborted) goBack();
-    }, 500);
+  if (!target) {
+    /* 找不到 handle → 用默认错误跳断连 */
+    abortWithError(DEFAULT_ERROR);
+    return;
   }
+
+  try {
+    target.onJoin.call(target);
+  } catch (e) {
+    console.error('[connecting] onJoin', e);
+    abortWithError(DEFAULT_ERROR);
+    return;
+  }
+
+  setTimeout(function() {
+    if (!aborted) goBack();
+  }, 500);
+}
 
   /* ==========================================================
      取消 / 回落
@@ -289,7 +380,6 @@
     if (aborted) return;
     aborted = true;
     if (stageTimer) clearTimeout(stageTimer);
-
     goBack();
   }
 
@@ -301,22 +391,14 @@
     }
   }
 
-  function goDisconnected() {
-    /* 用 mcBack.jump 保留 fromurl 栈，断连页的 Back 才能退回 multiplayer */
-    var url = 'disconnected.html?server=' + encodeURIComponent(addr || 'localhost:25565');
-    if (window.mcBack && typeof window.mcBack.jump === 'function') {
-      window.mcBack.jump(url);
-    } else {
-      location.href = url;
-    }
-  }
+
 
   cancelEl.addEventListener('click', function(e) {
     e.preventDefault();
     cancel();
   });
 
-  /* shouldCloseOnEsc() = false —— Esc 不取消 */
+  /* shouldCloseOnEsc() = false */
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') e.preventDefault();
   }, true);
