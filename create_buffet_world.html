@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Single Biome</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .cbw-screen {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  /* Header 40px：13 + 9 + 3 + 15 */
+  .cbw-header {
+    flex: 0 0 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    box-sizing: border-box;
+  }
+
+  .cbw-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .cbw-search {
+    width: 200px;
+    height: 15px;
+    box-sizing: border-box;
+  }
+
+  /* 内容区（列表） */
+  .cbw-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-image: url('../assets/background/menu_list_background.png');
+    background-repeat: repeat;
+    background-size: 32px 32px;
+    image-rendering: pixelated;
+  }
+
+  /* 每行 15 高 */
+  .cbw-entry {
+    width: 100%;
+    height: 15px;
+    padding: 0 5px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    user-select: none;
+  }
+  .cbw-entry:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+  .cbw-entry.selected {
+    background-color: rgba(255, 255, 255, 0.16);
+    box-shadow: inset 0 0 0 1px #ffffff;
+  }
+
+  /* Footer 33px */
+  .cbw-footer {
+    flex: 0 0 33px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-sizing: border-box;
+  }
+</style>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="cbw-screen">
+
+  <div class="cbw-header">
+    <div class="cbw-title" data-i18n="createWorld.customize.buffet.title">Single Biome</div>
+    <input class="mc-input search-hint cbw-search" id="cbw-search" type="text"
+           data-i18n-placeholder="createWorld.customize.buffet.search" placeholder="Search...">
+  </div>
+
+  <div class="cbw-content mc-scroll" id="cbw-list"></div>
+
+  <div class="cbw-footer">
+    <button class="mcbtn mcbtn-150" id="cbw-done"   data-i18n="gui.done">Done</button>
+    <button class="mcbtn mcbtn-150" id="cbw-cancel" data-i18n="gui.cancel">Cancel</button>
+  </div>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     i18n fallback
+     ========================================================== */
+  var FALLBACKS = {
+    'createWorld.customize.buffet.title':  'Single Biome',
+    'createWorld.customize.buffet.search': 'Search...',
+    'gui.done':                            'Done',
+    'gui.cancel':                          'Cancel'
+  };
+
+  function t(key, fallback) {
+    var v = (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+    if (v === key) {
+      if (FALLBACKS[key] != null) return FALLBACKS[key];
+      if (fallback != null) return fallback;
+    }
+    return v;
+  }
+
+  /* biome id → 显示名
+     原版：Identifier.toLanguageKey("biome") → "biome.minecraft.<id>"
+     有翻译用翻译，否则显示原始 id */
+  function biomeDisplayName(id) {
+    var key = 'biome.minecraft.' + id;
+    var v = t(key);
+    if (v === key) return id;
+    return v;
+  }
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var listEl   = document.getElementById('cbw-list');
+  var searchEl = document.getElementById('cbw-search');
+  var doneBtn  = document.getElementById('cbw-done');
+  var cancelBtn = document.getElementById('cbw-cancel');
+
+  /* ==========================================================
+     从 create_world 传来的初始 biome
+     ========================================================== */
+  var currentBiome = 'minecraft:plains';
+  var selectedBiome = null;         /* 用户选中的 biome id（不带 minecraft: 前缀） */
+
+  function normalizeBiomeId(v) {
+    if (!v) return null;
+    return String(v).replace(/^minecraft:/, '');
+  }
+
+  try {
+    var s = localStorage.getItem('mc_biome_editor_state');
+    if (s) {
+      var obj = JSON.parse(s);
+      if (obj && obj.biome) {
+        currentBiome = obj.biome;
+      }
+      localStorage.removeItem('mc_biome_editor_state');
+    }
+  } catch (e) {}
+
+  selectedBiome = normalizeBiomeId(currentBiome) || 'plains';
+
+  /* ==========================================================
+     加载 biome 清单
+     ========================================================== */
+  function loadScriptOnce(url) {
+    return new Promise(function(resolve, reject) {
+      var s = document.createElement('script');
+      s.src = url;
+      s.onload  = function() { resolve(); };
+      s.onerror = function() { reject(new Error('load fail: ' + url)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadBiomeIndex() {
+    return loadScriptOnce('assets/biome/index.js')
+      .catch(function() { window.__mcBiomes = []; })
+      .then(function() {
+        return Array.isArray(window.__mcBiomes) ? window.__mcBiomes.slice() : [];
+      });
+  }
+
+  /* ==========================================================
+     渲染
+     ========================================================== */
+  var allBiomeIds = [];       /* 原始 id 列表（不带 minecraft:） */
+  var filterText  = '';
+
+  function updateDoneState() {
+    doneBtn.disabled = !selectedBiome;
+  }
+
+  function renderList() {
+    listEl.innerHTML = '';
+
+    var lang = (navigator.language || 'en');
+
+    /* 构造 { id, name } 列表并按本地化名字排序 */
+    var entries = allBiomeIds.map(function(id) {
+      return { id: id, name: biomeDisplayName(id) };
+    });
+    entries.sort(function(a, b) {
+      return a.name.localeCompare(b.name, lang, { sensitivity: 'base', numeric: true });
+    });
+
+    /* 过滤 */
+    var lc = filterText.toLowerCase();
+    var filtered = !lc ? entries : entries.filter(function(e) {
+      return e.name.toLowerCase().indexOf(lc) >= 0;
+    });
+
+    filtered.forEach(function(e) {
+      var el = document.createElement('div');
+      el.className = 'cbw-entry';
+      el.dataset.id = e.id;
+      if (e.id === selectedBiome) el.classList.add('selected');
+      el.textContent = e.name;
+
+      el.addEventListener('click', function() {
+        selectedBiome = e.id;
+        var rows = listEl.querySelectorAll('.cbw-entry');
+        for (var i = 0; i < rows.length; i++) {
+          rows[i].classList.toggle('selected', rows[i].dataset.id === e.id);
+        }
+        updateDoneState();
+      });
+
+      listEl.appendChild(el);
+    });
+
+    updateDoneState();
+
+    /* 自动滚动到选中项 */
+    if (selectedBiome) {
+      var sel = listEl.querySelector('.cbw-entry.selected');
+      if (sel) {
+        var target = sel.offsetTop + sel.offsetHeight / 2 - listEl.clientHeight / 2;
+        listEl.scrollTop = Math.max(0, target);
+      }
+    }
+  }
+
+  /* ==========================================================
+     事件
+     ========================================================== */
+  searchEl.addEventListener('input', function() {
+    filterText = searchEl.value || '';
+    renderList();
+  });
+
+  function goBack() {
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('create_world.html');
+    } else {
+      location.href = 'create_world.html';
+    }
+  }
+
+  function doDone() {
+    if (!selectedBiome) return;
+    try {
+      localStorage.setItem('mc_biome_result', JSON.stringify({
+        biome: 'minecraft:' + selectedBiome
+      }));
+    } catch (e) {}
+    goBack();
+  }
+
+  doneBtn.addEventListener('click', doDone);
+  cancelBtn.addEventListener('click', goBack);
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      goBack();
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  function boot() {
+    loadBiomeIndex().then(function(list) {
+      allBiomeIds = list;
+      renderList();
+      try { searchEl.focus(); } catch (e) {}
+    });
+  }
+
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(boot);
+  } else {
+    boot();
+  }
+  document.addEventListener('i18n-ready', function() {
+    /* i18n 就绪后，名字变了要重排 */
+    renderList();
+  }, false);
+
+})();
+</script>
+
+</body>
+</html>

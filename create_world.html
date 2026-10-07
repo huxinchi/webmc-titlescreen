@@ -337,19 +337,20 @@
   }
 
   var state = {
-    name: 'New World',
-    gameMode: 'SURVIVAL',
-    difficulty: 'NORMAL',
-    allowCommands: null,
-    seed: '',
-    generateStructures: true,
-    bonusChest: false,
-    worldType: 'normal',
-    targetFolder: '',
-    flatPreset: null,
-    flatPresetParsed: null,
-    listeners: []
-  };
+  name: 'New World',
+  gameMode: 'SURVIVAL',
+  difficulty: 'NORMAL',
+  allowCommands: null,
+  seed: '',
+  generateStructures: true,
+  bonusChest: false,
+  worldType: 'normal',
+  targetFolder: '',
+  flatPreset: null,
+  flatPresetParsed: null,
+  singleBiome: null,            /* ← 新增 */
+  listeners: []
+};
 
   state.addListener = function(fn) { state.listeners.push(fn); };
 
@@ -573,25 +574,60 @@
       return (p && p.infoKey) ? t(p.infoKey) : '';
     });
 
-    var customizeBtn = makeBtn('mcbtn-150');
-    customizeBtn.setAttribute('data-i18n', 'selectWorld.customizeType');
-    customizeBtn.textContent = t('selectWorld.customizeType');
-    customizeBtn.addEventListener('click', function() {
-      if (state.worldType === 'flat') {
-        var url = 'preset_flat_world.html';
-        if (window.mcBack && typeof window.mcBack.jump === 'function') {
-          window.mcBack.jump(url);
-        } else {
-          location.href = url;
-        }
-        return;
-      }
-      window.mcDialog.alert({
-        title:   t('selectWorld.customizeType'),
-        message: 'World customization is not available in the web edition.'
-      });
-    });
-    row1.appendChild(customizeBtn);
+var customizeBtn = makeBtn('mcbtn-150');
+customizeBtn.setAttribute('data-i18n', 'selectWorld.customizeType');
+customizeBtn.textContent = t('selectWorld.customizeType');
+customizeBtn.addEventListener('click', function() {
+  if (state.worldType === 'flat') {
+    /* 写编辑器初始状态，供 create_flat_world 读取 */
+    var initLayers = null;
+    if (state.flatPresetParsed && state.flatPresetParsed.layers && state.flatPresetParsed.layers.length) {
+      initLayers = state.flatPresetParsed.layers;
+    } else {
+      initLayers = [
+        { block: 'minecraft:bedrock',     height: 1 },
+        { block: 'minecraft:dirt',        height: 2 },
+        { block: 'minecraft:grass_block', height: 1 }
+      ];
+    }
+    try {
+      localStorage.setItem('mc_flat_editor_state', JSON.stringify({
+        layers: initLayers,
+        biome:  (state.flatPresetParsed && state.flatPresetParsed.biome) || 'minecraft:plains'
+      }));
+    } catch (e) {}
+
+    var url = 'create_flat_world.html';
+    if (window.mcBack && typeof window.mcBack.jump === 'function') {
+      window.mcBack.jump(url);
+    } else {
+      location.href = url;
+    }
+    return;
+  }
+
+  if (state.worldType === 'single_biome_surface') {
+    try {
+      localStorage.setItem('mc_biome_editor_state', JSON.stringify({
+        biome: state.singleBiome || 'minecraft:plains'
+      }));
+    } catch (e) {}
+
+    var url2 = 'create_buffet_world.html';
+    if (window.mcBack && typeof window.mcBack.jump === 'function') {
+      window.mcBack.jump(url2);
+    } else {
+      location.href = url2;
+    }
+    return;
+  }
+
+  window.mcDialog.alert({
+    title:   t('selectWorld.customizeType'),
+    message: 'World customization is not available for this world type.'
+  });
+});
+row1.appendChild(customizeBtn);
 
     wrap.appendChild(row1);
 
@@ -782,15 +818,16 @@
       join:       'join',
       alert:      '',
 
-      gameMode:           state.gameMode,
-      difficulty:         state.difficulty,
-      allowCommands:      state.getAllowCommands(),
-      seed:               state.seed,
-      generateStructures: state.generateStructures,
-      bonusChest:         state.bonusChest,
-      worldType:          state.worldType,
-      flatPreset:         state.flatPreset || null,
-      flatPresetParsed:   state.flatPresetParsed || null,
+ gameMode:           state.gameMode,
+difficulty:         state.difficulty,
+allowCommands:      state.getAllowCommands(),
+seed:               state.seed,
+generateStructures: state.generateStructures,
+bonusChest:         state.bonusChest,
+worldType:          state.worldType,
+flatPreset:         state.flatPreset || null,
+flatPresetParsed:   state.flatPresetParsed || null,
+singleBiome:        state.singleBiome || null,
 
       onUpdate: function() {
         var d = new Date();
@@ -809,34 +846,49 @@
   /* ==========================================================
      启动
      ========================================================== */
-  function boot() {
-    buildGameTab();
-    buildWorldTab();
-    buildMoreTab();
-    setupTabs();
+function boot() {
+  buildGameTab();
+  buildWorldTab();
+  buildMoreTab();
+  setupTabs();
 
-    /* 从 preset_flat_world.html 返回 → 应用选中的超平坦定义 */
-    try {
-      var flatPreset = localStorage.getItem('mc_flat_preset');
-      var flatParsed = localStorage.getItem('mc_flat_preset_parsed');
-      if (flatPreset != null) {
-        localStorage.removeItem('mc_flat_preset');
-        localStorage.removeItem('mc_flat_preset_parsed');
+  /* 从 create_flat_world.html / preset_flat_world.html 返回 → 应用超平坦 */
+  try {
+    var flatPreset = localStorage.getItem('mc_flat_preset');
+    var flatParsed = localStorage.getItem('mc_flat_preset_parsed');
+    if (flatPreset != null) {
+      localStorage.removeItem('mc_flat_preset');
+      localStorage.removeItem('mc_flat_preset_parsed');
 
-        state.flatPreset = flatPreset;
-        if (flatParsed) {
-          try { state.flatPresetParsed = JSON.parse(flatParsed); }
-          catch (e) {}
-        }
+      state.flatPreset = flatPreset;
+      if (flatParsed) {
+        try { state.flatPresetParsed = JSON.parse(flatParsed); }
+        catch (e) {}
+      }
 
-        if (state.worldType !== 'flat') {
-          state.worldType = 'flat';
+      if (state.worldType !== 'flat') {
+        state.worldType = 'flat';
+      }
+    }
+  } catch (e) {}
+
+  /* 从 create_buffet_world.html 返回 → 应用单生物群系 */
+  try {
+    var biomeRaw = localStorage.getItem('mc_biome_result');
+    if (biomeRaw) {
+      localStorage.removeItem('mc_biome_result');
+      var bObj = JSON.parse(biomeRaw);
+      if (bObj && bObj.biome) {
+        state.singleBiome = bObj.biome;
+        if (state.worldType !== 'single_biome_surface') {
+          state.worldType = 'single_biome_surface';
         }
       }
-    } catch (e) {}
+    }
+  } catch (e) {}
 
-    state.onChanged();
-  }
+  state.onChanged();
+}
 
   if (window.i18n && window.i18n.ready) {
     window.i18n.ready(boot);
