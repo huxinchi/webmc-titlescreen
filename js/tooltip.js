@@ -13,6 +13,44 @@
     return v;
   }
 
+  /* ==========================================================
+     MC § 码 → HTML
+     ========================================================== */
+  var COLOR_CODES = {
+    '0': '#000000', '1': '#0000AA', '2': '#00AA00', '3': '#00AAAA',
+    '4': '#AA0000', '5': '#AA00AA', '6': '#FFAA00', '7': '#AAAAAA',
+    '8': '#555555', '9': '#5555FF', 'a': '#55FF55', 'b': '#55FFFF',
+    'c': '#FF5555', 'd': '#FF55FF', 'e': '#FFFF55', 'f': '#FFFFFF'
+  };
+
+  function mcTextToHtml(text) {
+    var out = '';
+    var i = 0;
+    var openSpan = false;
+    while (i < text.length) {
+      var c = text[i];
+      if (c === '§' && i + 1 < text.length) {
+        var code = text[i + 1].toLowerCase();
+        if (COLOR_CODES[code]) {
+          if (openSpan) { out += '</span>'; openSpan = false; }
+          out += '<span style="color:' + COLOR_CODES[code] + '">';
+          openSpan = true;
+        } else if (code === 'r') {
+          if (openSpan) { out += '</span>'; openSpan = false; }
+        }
+        i += 2;
+        continue;
+      }
+      if (c === '<')      out += '&lt;';
+      else if (c === '>') out += '&gt;';
+      else if (c === '&') out += '&amp;';
+      else                out += c;
+      i++;
+    }
+    if (openSpan) out += '</span>';
+    return out;
+  }
+
   function ensureRoot() {
     var root = document.getElementById(ROOT_ID);
     if (!root) {
@@ -51,7 +89,7 @@
     if (!text) return;
 
     var root = ensureRoot();
-    root.textContent = text;
+    root.innerHTML = mcTextToHtml(text);
     root.classList.add('visible');
     positionAt(clientX, clientY);
   }
@@ -63,7 +101,6 @@
     currentMessage = null;
   }
 
-  /* 从元素上取 tooltip 文本 */
   function getMessage(el) {
     if (!el) return null;
     if (el._mcTooltipFn) {
@@ -112,22 +149,20 @@
     hide();
   }, true);
 
-  /* 页面滚动 / 触摸时隐藏 */
   document.addEventListener('scroll', hide, true);
   document.addEventListener('touchstart', hide, true);
 
-  /* i18n 就绪后若正在显示 tooltip，重新计算文本 */
   document.addEventListener('i18n-ready', function() {
     if (!currentEl) return;
     var msg = getMessage(currentEl);
     if (!msg) { hide(); return; }
     currentMessage = msg;
     var root = document.getElementById(ROOT_ID);
-    if (root) root.textContent = msg;
+    if (root) root.innerHTML = mcTextToHtml(msg);
   }, false);
 
   /* ==========================================================
-     对外
+     对外 API
      ========================================================== */
   window.mcTooltip = {
     show: show,

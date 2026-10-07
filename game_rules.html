@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Edit Game Rules</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<link rel="stylesheet" href="css/tooltip.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .gr-screen {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .gr-header {
+    flex: 0 0 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    box-sizing: border-box;
+    padding: 4px 0;
+  }
+
+  .gr-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .gr-search {
+    width: 200px;
+    height: 15px;
+    box-sizing: border-box;
+  }
+
+  .gr-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-image: url('../assets/background/menu_list_background.png');
+    background-repeat: repeat;
+    background-size: 32px 32px;
+    image-rendering: pixelated;
+  }
+
+  .gr-row {
+    width: 100%;
+    height: 24px;
+    padding: 0 8px;
+    box-sizing: border-box;
+    position: relative;
+    user-select: none;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+  }
+
+  .gr-row.cat {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFF55;
+    font-weight: bold;
+    cursor: default;
+  }
+
+  .gr-row.rule {
+    padding-right: 53px;
+  }
+
+  .gr-label {
+    position: absolute;
+    left: 8px;
+    right: 53px;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 10px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+  }
+  .gr-label.line1 { top: 2px; }
+  .gr-label.line2 { top: 12px; }
+
+  .gr-ctrl {
+    position: absolute;
+    right: 5px;
+    top: 2px;
+    width: 44px;
+    height: 20px;
+  }
+
+  .gr-ctrl.mcbtn-44 {
+    padding: 0 2px;
+  }
+
+  .gr-ctrl.mc-input {
+    width: 44px;
+    height: 20px;
+    font-size: var(--font-size, 10px);
+    text-align: center;
+    padding: 0 2px;
+  }
+  .gr-ctrl.mc-input.invalid {
+    color: #FF5555;
+  }
+
+  .gr-footer {
+    flex: 0 0 33px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-sizing: border-box;
+  }
+</style>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="gr-screen">
+
+  <div class="gr-header">
+    <div class="gr-title" id="gr-title" data-i18n="editGamerule.title">Edit Game Rules</div>
+    <input class="mc-input search-hint gr-search" id="gr-search" type="text"
+           data-i18n-placeholder="gui.game_rule.search" placeholder="Search...">
+  </div>
+
+  <div class="gr-content mc-scroll" id="gr-list"></div>
+
+  <div class="gr-footer">
+    <button class="mcbtn mcbtn-150" id="gr-done"   data-i18n="gui.done">Done</button>
+    <button class="mcbtn mcbtn-150" id="gr-cancel" data-i18n="gui.cancel">Cancel</button>
+  </div>
+
+</div>
+
+<script src="js/game_rules_data.js"></script>
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     i18n fallback
+     ========================================================== */
+  var FALLBACKS = {
+    'editGamerule.title':    'Edit Game Rules',
+    'gui.game_rule.search':  'Search...',
+    'editGamerule.default':  'Default: %s',
+    'gui.done':              'Done',
+    'gui.cancel':            'Cancel',
+    'options.on':            'ON',
+    'options.off':           'OFF',
+
+    'gamerule.category.chat':     'Chat',
+    'gamerule.category.drops':    'Drops',
+    'gamerule.category.misc':     'Miscellaneous',
+    'gamerule.category.mobs':     'Mobs',
+    'gamerule.category.player':   'Player',
+    'gamerule.category.spawning': 'Spawning',
+    'gamerule.category.updates':  'World Updates'
+  };
+
+  function t(key, fallback) {
+    var v = (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+    if (v === key) {
+      if (FALLBACKS[key] != null) return FALLBACKS[key];
+      if (fallback != null) return fallback;
+    }
+    return v;
+  }
+
+  /* ==========================================================
+     规则数据
+     ========================================================== */
+  var RULES = window.__mcGameRules || [];
+  var CATEGORIES = window.__mcGameRuleCategories || [];
+
+  /* ==========================================================
+     规则名翻译：
+       1. 优先 rule.langKey（camelCase）
+       2. 其次 gamerule.minecraft.<id>（4 条新格式）
+       3. 再次 gamerule.<id>
+       4. 最后 null
+     ========================================================== */
+  function tGameruleRule(rule, suffix) {
+    suffix = suffix || '';
+
+    if (rule.langKey) {
+      var k1 = 'gamerule.' + rule.langKey + suffix;
+      var v1 = t(k1);
+      if (v1 !== k1) return v1;
+    }
+
+    var k2 = 'gamerule.minecraft.' + rule.id + suffix;
+    var v2 = t(k2);
+    if (v2 !== k2) return v2;
+
+    var k3 = 'gamerule.' + rule.id + suffix;
+    var v3 = t(k3);
+    if (v3 !== k3) return v3;
+
+    return null;
+  }
+
+  /* 分类翻译（只查 gamerule.category.<cat>） */
+  function tCategory(cat) {
+    var k = 'gamerule.category.' + cat;
+    var v = t(k);
+    if (v !== k) return v;
+    return null;
+  }
+
+  /* ==========================================================
+     当前状态
+     ========================================================== */
+  var values = {};
+
+  function loadState() {
+    var saved = null;
+    try {
+      var raw = localStorage.getItem('mc_gamerules_editing');
+      if (raw) {
+        saved = JSON.parse(raw);
+        localStorage.removeItem('mc_gamerules_editing');
+      }
+    } catch (e) {}
+
+    RULES.forEach(function(r) {
+      values[r.id] = (saved && typeof saved[r.id] !== 'undefined')
+        ? saved[r.id]
+        : r.default;
+    });
+  }
+
+  /* ==========================================================
+     实验性 feature 过滤
+     ========================================================== */
+  var enabledFeatures = {};
+  try {
+    var rawF = localStorage.getItem('mc_gamerules_features');
+    if (rawF) {
+      var arr = JSON.parse(rawF);
+      if (Array.isArray(arr)) {
+        arr.forEach(function(f) { enabledFeatures[f] = true; });
+      }
+      localStorage.removeItem('mc_gamerules_features');
+    }
+  } catch (e) {}
+
+  function isRuleEnabled(rule) {
+    if (!rule.feature) return true;
+    return !!enabledFeatures[rule.feature];
+  }
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var listEl    = document.getElementById('gr-list');
+  var searchEl  = document.getElementById('gr-search');
+  var doneBtn   = document.getElementById('gr-done');
+  var cancelBtn = document.getElementById('gr-cancel');
+
+  var invalidIds = {};
+
+  function updateDoneState() {
+    var anyInvalid = Object.keys(invalidIds).some(function(k) { return invalidIds[k]; });
+    doneBtn.disabled = anyInvalid;
+  }
+
+  function ruleMatches(rule, filter) {
+    if (!filter) return true;
+    var id = rule.id;
+
+    var nameText = tGameruleRule(rule) || id;
+    var catText  = tCategory(rule.cat) || rule.cat;
+    var descText = tGameruleRule(rule, '.description') || '';
+
+    var lc = filter.toLowerCase();
+    return (
+      id.toLowerCase().indexOf(lc) >= 0
+      || nameText.toLowerCase().indexOf(lc) >= 0
+      || catText.toLowerCase().indexOf(lc) >= 0
+      || descText.toLowerCase().indexOf(lc) >= 0
+    );
+  }
+
+  function buildRuleRow(rule) {
+    var row = document.createElement('div');
+    row.className = 'gr-row rule';
+
+    /* ★ 用 tGameruleRule（不是 tGamerule） */
+    var labelText = tGameruleRule(rule) || rule.id;
+
+    var useTwoLines = labelText.length > 24;
+    if (useTwoLines) {
+      var mid = Math.ceil(labelText.length / 2);
+      var sp = labelText.lastIndexOf(' ', mid);
+      if (sp < 0) sp = mid;
+      var line1 = labelText.substring(0, sp).trim();
+      var line2 = labelText.substring(sp).trim();
+
+      var l1 = document.createElement('div');
+      l1.className = 'gr-label line1';
+      l1.textContent = line1;
+      row.appendChild(l1);
+
+      var l2 = document.createElement('div');
+      l2.className = 'gr-label line2';
+      l2.textContent = line2;
+      row.appendChild(l2);
+    } else {
+      var l = document.createElement('div');
+      l.className = 'gr-label';
+      l.style.top = '7px';
+      l.textContent = labelText;
+      row.appendChild(l);
+    }
+
+    if (rule.type === 'bool') {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mcbtn mcbtn-44 gr-ctrl';
+      btn.textContent = values[rule.id] ? t('options.on') : t('options.off');
+      btn.addEventListener('click', function() {
+        values[rule.id] = !values[rule.id];
+        btn.textContent = values[rule.id] ? t('options.on') : t('options.off');
+        if (window.mcPlayClick) { try { window.mcPlayClick(); } catch (e) {} }
+      });
+      row.appendChild(btn);
+    } else if (rule.type === 'int') {
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'mc-input gr-ctrl';
+      input.value = String(values[rule.id]);
+      input.setAttribute('autocomplete', 'off');
+      input.setAttribute('spellcheck', 'false');
+
+      input.addEventListener('input', function() {
+        var v = input.value.trim();
+        var n = parseInt(v, 10);
+        var ok = /^-?\d+$/.test(v) && isFinite(n)
+              && (rule.min == null || n >= rule.min)
+              && (rule.max == null || n <= rule.max);
+        if (ok) {
+          input.classList.remove('invalid');
+          delete invalidIds[rule.id];
+          values[rule.id] = n;
+        } else {
+          input.classList.add('invalid');
+          invalidIds[rule.id] = true;
+        }
+        updateDoneState();
+      });
+
+      row.appendChild(input);
+    }
+
+   /* Tooltip：
+     §e<rule id>            ← 黄色，对齐原版 ChatFormatting.YELLOW
+     <中文描述>              ← 若存在
+     §7Default: <默认值>     ← 灰色，对齐原版 ChatFormatting.GRAY
+   （原版 tooltip 里没显示中文名，只显示 id + description + default） */
+var tipLines = [];
+tipLines.push('§e' + rule.id);
+
+var descText = tGameruleRule(rule, '.description');
+if (descText) tipLines.push(descText);
+
+var defTpl = t('editGamerule.default', 'Default: %s');
+var defStr = defTpl.indexOf('%s') >= 0
+  ? defTpl.replace('%s', String(rule.default))
+  : defTpl + ' ' + rule.default;
+tipLines.push('§7' + defStr);
+
+
+
+    window.mcTooltip.attach(row, function() { return tipLines.join('\n'); });
+
+    return row;
+  }
+
+  function renderList() {
+    var filter = (searchEl.value || '').trim();
+    listEl.innerHTML = '';
+
+    CATEGORIES.forEach(function(cat) {
+      var catRules = RULES.filter(function(r) {
+        return r.cat === cat && isRuleEnabled(r);
+      });
+      var visibleRules = catRules.filter(function(r) { return ruleMatches(r, filter); });
+      if (visibleRules.length === 0) return;
+
+      var catRow = document.createElement('div');
+      catRow.className = 'gr-row cat';
+      catRow.textContent = tCategory(cat) || cat;
+      listEl.appendChild(catRow);
+
+      visibleRules.sort(function(a, b) {
+        return a.id.localeCompare(b.id);
+      });
+
+      visibleRules.forEach(function(r) {
+        listEl.appendChild(buildRuleRow(r));
+      });
+    });
+
+    updateDoneState();
+  }
+
+  /* ==========================================================
+     事件
+     ========================================================== */
+  searchEl.addEventListener('input', renderList);
+
+  document.addEventListener('keydown', function(e) {
+    if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      doCancel();
+    }
+  }, true);
+
+  function goBack() {
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('create_world.html');
+    } else {
+      location.href = 'create_world.html';
+    }
+  }
+
+  function doDone() {
+    var anyInvalid = Object.keys(invalidIds).some(function(k) { return invalidIds[k]; });
+    if (anyInvalid) return;
+    try {
+      localStorage.setItem('mc_gamerules_result', JSON.stringify(values));
+    } catch (e) {}
+    goBack();
+  }
+
+  function doCancel() {
+    goBack();
+  }
+
+  doneBtn.addEventListener('click', doDone);
+  cancelBtn.addEventListener('click', doCancel);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  function boot() {
+    loadState();
+    renderList();
+  }
+
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(boot);
+  } else {
+    boot();
+  }
+  document.addEventListener('i18n-ready', function() {
+    if (RULES.length) renderList();
+  }, false);
+
+})();
+</script>
+
+</body>
+</html>

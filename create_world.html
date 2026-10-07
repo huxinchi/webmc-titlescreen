@@ -349,7 +349,8 @@ var state = {
   flatPreset: null,
   flatPresetParsed: null,
   singleBiome: null,
-  experiments: null,            /* ← 新增 */
+  experiments: null,           
+  gameRules: null,            
   listeners: []
 };
 
@@ -713,7 +714,7 @@ row1.appendChild(customizeBtn);
     var wrap = document.getElementById('cw-tab-more');
     wrap.innerHTML = '';
 
- function addTipBtn(key, tipTitle) {
+function addTipBtn(key, tipTitle) {
   var b = makeBtn('mcbtn-210');
   b.setAttribute('data-i18n', key);
   b.textContent = t(key);
@@ -740,7 +741,26 @@ function addNavBtn(key, url) {
   wrap.appendChild(b);
 }
 
-addTipBtn('selectWorld.gameRules', 'Game rules editing');
+/* Game Rules：先写编辑状态 + feature flag，再跳 */
+var gameRulesBtn = makeBtn('mcbtn-210');
+gameRulesBtn.setAttribute('data-i18n', 'selectWorld.gameRules');
+gameRulesBtn.textContent = t('selectWorld.gameRules');
+gameRulesBtn.addEventListener('click', function() {
+  try {
+    localStorage.setItem('mc_gamerules_editing', JSON.stringify(state.gameRules || {}));
+    localStorage.setItem('mc_gamerules_features', JSON.stringify(
+      (state.experiments && state.experiments.features) || []
+    ));
+  } catch (e) {}
+
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump('game_rules.html');
+  } else {
+    location.href = 'game_rules.html';
+  }
+});
+wrap.appendChild(gameRulesBtn);
+
 addNavBtn('selectWorld.experiments', 'experiments.html');
 addTipBtn('selectWorld.dataPacks', 'Data packs');
   }
@@ -844,6 +864,7 @@ flatPreset:         state.flatPreset || null,
 flatPresetParsed:   state.flatPresetParsed || null,
 singleBiome:        state.singleBiome || null,
 experiments:        state.experiments || null,
+gameRules:          state.gameRules || null,
 
       onUpdate: function() {
         var d = new Date();
@@ -911,6 +932,18 @@ try {
     var expObj = JSON.parse(expRaw);
     if (expObj) {
       state.experiments = expObj;
+    }
+  }
+} catch (e) {}
+
+/* 从 game_rules.html 返回 → 应用游戏规则 */
+try {
+  var grRaw = localStorage.getItem('mc_gamerules_result');
+  if (grRaw) {
+    localStorage.removeItem('mc_gamerules_result');
+    var grObj = JSON.parse(grRaw);
+    if (grObj && typeof grObj === 'object') {
+      state.gameRules = grObj;
     }
   }
 } catch (e) {}
