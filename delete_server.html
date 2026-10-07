@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Delete Server</title>
+<title>Confirm</title>
 
 <link rel="preload" as="image" href="assets/background/panorama_equirect.png">
 <link rel="preload" as="image" href="assets/background/panorama_0.png">
@@ -19,11 +19,7 @@
 <script src="js/font.js"></script>
 
 <style>
-  html, body {
-    margin: 0; padding: 0;
-    width: 100%; height: 100%;
-    overflow: hidden;
-  }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
   body {
     color: #fff;
     font-family: 'Minecraft', monospace;
@@ -32,7 +28,6 @@
     position: relative;
   }
 
-  /* 对应 FrameLayout.centerInRectangle(this.layout, getRectangle()) */
   .confirm-screen {
     position: fixed;
     top: 0; left: 50%;
@@ -49,9 +44,8 @@
     overflow: hidden;
   }
 
-  /* LinearLayout.vertical().spacing(8) */
   .confirm-box {
-    width: calc(100% - 50px);   /* 对齐 message maxWidth = width - 50 */
+    width: calc(100% - 50px);
     max-width: 600px;
     display: flex;
     flex-direction: column;
@@ -60,7 +54,6 @@
     box-sizing: border-box;
   }
 
-  /* StringWidget(title) */
   .confirm-title {
     font-family: 'Minecraft', monospace;
     font-size: var(--font-size, 10px);
@@ -71,7 +64,6 @@
     user-select: none;
   }
 
-  /* MultiLineTextWidget(message).setMaxWidth(width-50).setCentered(true) */
   .confirm-message {
     max-width: 100%;
     font-family: 'Minecraft', monospace;
@@ -86,7 +78,6 @@
     box-sizing: border-box;
   }
 
-  /* LinearLayout.horizontal().spacing(4) + paddingTop(16) */
   .confirm-buttons {
     display: flex;
     gap: 4px;
@@ -106,13 +97,12 @@
 <div class="confirm-screen">
   <div class="confirm-box">
 
-    <div class="confirm-title" id="confirm-title">Are you sure you want to remove this server?</div>
-
+    <div class="confirm-title"   id="confirm-title"></div>
     <div class="confirm-message" id="confirm-message"></div>
 
     <div class="confirm-buttons">
-      <a class="mcbtn mcbtn-150" id="btn-yes" href="#">Delete</a>
-      <a class="mcbtn mcbtn-150" id="btn-no"  href="#">Cancel</a>
+      <a class="mcbtn mcbtn-150" id="btn-yes" href="#">Yes</a>
+      <a class="mcbtn mcbtn-150" id="btn-no"  href="#">No</a>
     </div>
 
   </div>
@@ -124,125 +114,94 @@
 (function() {
   'use strict';
 
-  var STORAGE_KEY = 'mc_servers';
-
   /* ==========================================================
-     参数：?id=服务器 id
+     参数
+       ?title=<encoded>     标题
+       ?message=<encoded>   正文
+       ?yes=<encoded>       Yes 按钮文字（缺省用 gui.yes）
+       ?no=<encoded>        No 按钮文字（缺省用 gui.no）
      ========================================================== */
-  var params   = new URLSearchParams(location.search);
-  var serverId = params.get('id') || '';
+  var params = new URLSearchParams(location.search);
 
   function t(key, fallback) {
     var v = (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
-    return v === key ? (fallback != null ? fallback : key) : v;
+    if (v === key && fallback != null) return fallback;
+    return v;
   }
 
-  /* ==========================================================
-     从 localStorage 读该 id 的服务器名
-     ========================================================== */
-  function findServerName(id) {
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return '';
-      var arr = JSON.parse(raw);
-      if (!Array.isArray(arr)) return '';
-      for (var i = 0; i < arr.length; i++) {
-        if (arr[i] && arr[i].id === id) {
-          return arr[i].name || arr[i].ip || '';
-        }
-      }
-    } catch (e) {}
-    return '';
-  }
-
-  /* ==========================================================
-     从 localStorage 删除该 id 的条目
-     ========================================================== */
-  function removeServer(id) {
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      var arr = JSON.parse(raw);
-      if (!Array.isArray(arr)) return;
-      var out = arr.filter(function(s) {
-        return !s || s.id !== id;
-      });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
-    } catch (e) {}
-  }
-
-  /* ==========================================================
-     DOM 引用
-     ========================================================== */
   var titleEl   = document.getElementById('confirm-title');
   var messageEl = document.getElementById('confirm-message');
   var yesEl     = document.getElementById('btn-yes');
   var noEl      = document.getElementById('btn-no');
 
-  var serverName = findServerName(serverId);
-
   /* ==========================================================
-     应用文本（i18n 就绪前后各跑一次）
-     key 取自原版 Minecraft：
-       selectServer.deleteQuestion — 标题
-       selectServer.deleteWarning  — 消息（含 %s 占位）
-       selectServer.deleteButton   — Yes
-       gui.cancel                  — No
-     如果语言文件里缺 key，会回落到 fallback
+     应用文本
+     调用方已经算好所有文案并塞进 URL，本页只做展示
      ========================================================== */
   function apply() {
-    titleEl.textContent = t(
-      'selectServer.deleteQuestion',
-      'Are you sure you want to remove this server?'
-    );
+    var title   = params.get('title');
+    var message = params.get('message');
+    var yesText = params.get('yes');
+    var noText  = params.get('no');
 
-    var warnTpl = t(
-      'selectServer.deleteWarning',
-      "'%s' will be lost forever! (A long time!)"
-    );
-    messageEl.textContent = warnTpl.indexOf('%s') >= 0
-      ? warnTpl.replace('%s', serverName)
-      : warnTpl;
+    titleEl.textContent = (title != null && title !== '')
+      ? title
+      : t('selectServer.deleteQuestion', 'Are you sure?');
 
-    yesEl.textContent = t('selectServer.deleteButton', t('gui.yes', 'Yes'));
-    noEl.textContent  = t('gui.cancel', t('gui.no', 'No'));
+    messageEl.textContent = (message != null) ? message : '';
+
+    yesEl.textContent = (yesText != null && yesText !== '')
+      ? yesText
+      : t('gui.yes', 'Yes');
+
+    noEl.textContent = (noText != null && noText !== '')
+      ? noText
+      : t('gui.no', 'No');
   }
 
   apply();
   document.addEventListener('i18n-ready', apply, false);
 
   /* ==========================================================
+     结果写回 localStorage
+       调用方页面负责在加载时读 mc_confirm_result 并执行动作
+     ========================================================== */
+function setResult(value) {
+  try {
+    localStorage.setItem('mc_confirm_result', value);
+  } catch (e) {}
+}
+
+  /* ==========================================================
      返回上一页
-     - 栈里有上一页 → 弹栈回去（multiplayer）
-     - 栈为空       → fallback 到 multiplayer.html
+     - fromurl 栈非空 → 弹栈回去（调用方页面）
+     - 栈空          → fallback index.html
      ========================================================== */
   function goBack() {
     if (window.mcBack && typeof window.mcBack.back === 'function') {
-      window.mcBack.back('multiplayer.html');
+      window.mcBack.back('index.html');
     } else {
-      location.href = 'multiplayer.html';
+      location.href = 'index.html';
     }
   }
 
   /* ==========================================================
-     Yes → callback.accept(true)：删除 + 返回
+     Yes / No
      ========================================================== */
   yesEl.addEventListener('click', function(e) {
     e.preventDefault();
-    removeServer(serverId);
+    setResult('yes');
     goBack();
   });
 
-  /* ==========================================================
-     No → callback.accept(false)：直接返回
-     ========================================================== */
   noEl.addEventListener('click', function(e) {
     e.preventDefault();
+    setResult('no');
     goBack();
   });
 
   /* ==========================================================
-     Esc → 等价于 No（对齐 ConfirmScreen.keyPressed）
+     Esc = No（对齐原版 ConfirmScreen.keyPressed）
      ========================================================== */
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {

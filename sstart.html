@@ -100,7 +100,11 @@
 <script>
 (function() {
   'use strict';
-
+function t(key, fallback) {
+  var v = (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+  if (v === key && fallback != null) return fallback;
+  return v;
+}
   var STORAGE_KEY = 'mc_worlds';
   var FN_KEY      = '__fn__';
   var DEFAULT_ICON = 'assets/icon/world_selection/unknown_server.png';
@@ -373,9 +377,31 @@
   });
 
   btnDelete.addEventListener('click', function() {
-    if (!selected) return;
-    callHandle(selected, 'onDelete');
-  });
+  if (!selected) return;
+  var worldName = selected.name || selected.folder || '';
+
+  var warnTpl = t('selectWorld.deleteWarning', "'%s' will be lost forever! (A long time!)");
+  var warnMsg = warnTpl.indexOf('%s') >= 0 ? warnTpl.replace('%s', worldName) : warnTpl;
+
+  try {
+    localStorage.setItem('mc_confirm_action', JSON.stringify({
+      type: 'deleteWorld',
+      data: { folder: selected.folder }
+    }));
+  } catch (e) {}
+
+  var url = 'delete_server.html'
+    + '?title='   + encodeURIComponent(t('selectWorld.deleteQuestion', 'Are you sure you want to delete this world?'))
+    + '&message=' + encodeURIComponent(warnMsg)
+    + '&yes='     + encodeURIComponent(t('selectWorld.deleteButton', t('gui.yes', 'Yes')))
+    + '&no='      + encodeURIComponent(t('gui.cancel', t('gui.no', 'No')));
+
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+});
 
   btnRecreate.addEventListener('click', function() {
     if (!selected) return;
@@ -421,7 +447,66 @@
       refreshWorlds();
     }
   };
+/* ==========================================================
+   从 delete_server.html 返回后，检查结果并执行动作
+   ========================================================== */
+(function checkConfirmResult() {
+  var actionRaw = null;
+  var result    = null;
+  try {
+    actionRaw = localStorage.getItem('mc_confirm_action');
+    result    = localStorage.getItem('mc_confirm_result');
+    localStorage.removeItem('mc_confirm_action');
+    localStorage.removeItem('mc_confirm_result');
+  } catch (e) {
+    alert('[confirm] storage 读取失败: ' + e.message);
+    return;
+  }
 
+
+
+  if (!actionRaw || result !== 'yes') return;
+
+  var action;
+  try { action = JSON.parse(actionRaw); } catch (e) {
+    alert('[confirm] JSON.parse 失败: ' + e.message);
+    return;
+  }
+  if (!action) return;
+
+  setTimeout(function() {
+    var folder = action.data && action.data.folder;
+
+    if (action.type === 'deleteWorld') {
+      if (!folder) {
+        alert('[confirm] folder 为空，无法定位世界');
+        return;
+      }
+
+      var world = null;
+      for (var i = 0; i < WORLDS.length; i++) {
+        if (WORLDS[i] && WORLDS[i].folder === folder) { world = WORLDS[i]; break; }
+      }
+
+      if (!world) {
+        var all = WORLDS.map(function(w) { return w && w.folder; }).join(', ');
+        alert('[confirm] 找不到 folder=' + folder + '\n现有 folders: ' + all);
+        return;
+      }
+
+      var idx = WORLDS.indexOf(world);
+      if (idx >= 0) WORLDS.splice(idx, 1);
+      saveWorlds(WORLDS);
+      refreshWorlds();
+    } else if (action.type === 'recreateWorld') {
+      var w2 = null;
+      for (var j = 0; j < WORLDS.length; j++) {
+        if (WORLDS[j] && WORLDS[j].folder === folder) { w2 = WORLDS[j]; break; }
+      }
+      if (w2) callHandle(w2, 'onRecreate');
+    }
+  }, 50);
+})();
   refreshWorlds();
   searchBox.focus();
 

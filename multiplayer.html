@@ -109,7 +109,11 @@
 <script>
 (function() {
   'use strict';
-
+function t(key, fallback) {
+  var v = (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+  if (v === key && fallback != null) return fallback;
+  return v;
+}
   var STORAGE_KEY     = 'mc_servers';
   var STORAGE_VERSION = 8;
   var VERSION_KEY     = 'mc_servers_version';
@@ -594,21 +598,33 @@ if (!m || !m.preset) {
 
   /* Delete —— 无 onDelete 就走确认页 */
   btnDelete.addEventListener('click', function() {
-    var sel = list.getSelected();
-    if (!sel || sel._isLanHeader || sel.type === 'lan') return;
+var sel = list.getSelected();
+if (!sel || sel._isLanHeader || sel.type === 'lan') return;
 
-    if (typeof sel.onDelete === 'function') {
-      try { sel.onDelete.call(sel); return; }
-      catch (e) { console.error('[multiplayer] onDelete', e); }
-    }
+/* 不再提前走 handle —— 统一先跳 confirm 页 */
+var serverName = sel.name || sel.ip || sel.address || '';
+  var warnTpl = t('selectServer.deleteWarning', "'%s' will be lost forever! (A long time!)");
+  var warnMsg = warnTpl.indexOf('%s') >= 0 ? warnTpl.replace('%s', serverName) : warnTpl;
 
-    var target = 'delete_server.html?id=' + encodeURIComponent(sel.id || '');
-    if (window.mcBack && typeof window.mcBack.jump === 'function') {
-      window.mcBack.jump(target);
-    } else {
-      location.href = target;
-    }
-  });
+  try {
+    localStorage.setItem('mc_confirm_action', JSON.stringify({
+      type: 'deleteServer',
+      data: { id: sel.id }
+    }));
+  } catch (e) {}
+
+  var url = 'delete_server.html'
+    + '?title='   + encodeURIComponent(t('selectServer.deleteQuestion', 'Are you sure you want to remove this server?'))
+    + '&message=' + encodeURIComponent(warnMsg)
+    + '&yes='     + encodeURIComponent(t('selectServer.deleteButton', t('gui.yes', 'Yes')))
+    + '&no='      + encodeURIComponent(t('gui.cancel', t('gui.no', 'No')));
+
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+});
 
   /* ==========================================================
      i18n 就绪后重新渲染
@@ -751,7 +767,46 @@ if (!m || !m.preset) {
       showDisconnected(addr);
     }, 50);
   })();
+(function checkConfirmResult() {
+  var actionRaw = null;
+  var result    = null;
+  try {
+    actionRaw = localStorage.getItem('mc_confirm_action');
+    result    = localStorage.getItem('mc_confirm_result');
+    localStorage.removeItem('mc_confirm_action');
+    localStorage.removeItem('mc_confirm_result');
+  } catch (e) { return; }
 
+  if (!actionRaw || result !== 'yes') return;
+
+  var action;
+  try { action = JSON.parse(actionRaw); } catch (e) { return; }
+  if (!action) return;
+
+setTimeout(function() {
+  if (action.type === 'deleteServer') {
+    var id  = action.data && action.data.id;
+    var sel = null;
+    for (var i = 0; i < SERVERS.length; i++) {
+      if (SERVERS[i] && SERVERS[i].id === id) { sel = SERVERS[i]; break; }
+    }
+    if (!sel) return;
+
+    /* 有 onDelete handle → 由 handle 决定做什么（它可能自己再删 / 只是提示） */
+    if (typeof sel.onDelete === 'function') {
+      try { sel.onDelete.call(sel); return; }
+      catch (e) { console.error('[multiplayer] onDelete', e); }
+    }
+
+    /* 无 handle → 默认从列表删除 */
+    var idx = SERVERS.indexOf(sel);
+    if (idx >= 0) SERVERS.splice(idx, 1);
+    saveServers(SERVERS);
+    refreshListUI();
+    updateButtonState(null);
+  }
+}, 50);
+})();
   /* ==========================================================
      启动
      ========================================================== */
