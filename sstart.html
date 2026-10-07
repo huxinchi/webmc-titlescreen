@@ -213,7 +213,23 @@ function t(key, fallback) {
       try { fn.call(world); } catch (e) { console.error('[world]', name, e); }
     }
   }
+function goWorldLoading(world) {
+  if (!world) return;
 
+  try {
+    localStorage.setItem('mc_pending_join', JSON.stringify({
+      type: 'world',
+      folder: world.folder || ''
+    }));
+  } catch (e) {}
+
+  var url = 'world_loading.html?folder=' + encodeURIComponent(world.folder || '');
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+}
   function updateButtonState(world) {
     selected = world || null;
     var isError = selected && selected.alert === 'error';
@@ -245,11 +261,11 @@ function t(key, fallback) {
     if (world.join) joinEl.dataset.join = world.join;
 
     joinEl.addEventListener('click', function(e) {
-      e.stopPropagation();
-      setSelected(el);
-      if (world.alert === 'error') return;
-      callHandle(world, 'onJoin');
-    });
+  e.stopPropagation();
+  setSelected(el);
+  if (world.alert === 'error') return;
+  goWorldLoading(world);
+});
 
     var alertEl = document.createElement('div');
     alertEl.className = 'world-alert';
@@ -267,13 +283,13 @@ function t(key, fallback) {
       joinEl.style.backgroundImage = '';
     });
 
-    alertEl.addEventListener('click', function(e) {
-      e.stopPropagation();
-      setSelected(el);
-      callHandle(world, 'onAlertClick');
-      if (world.alert === 'error') return;
-      callHandle(world, 'onJoin');
-    });
+alertEl.addEventListener('click', function(e) {
+  e.stopPropagation();
+  setSelected(el);
+  callHandle(world, 'onAlertClick');
+  if (world.alert === 'error') return;
+  goWorldLoading(world);
+});
 
     statusEl.appendChild(joinEl);
     statusEl.appendChild(alertEl);
@@ -304,11 +320,11 @@ function t(key, fallback) {
     el.appendChild(infoEl);
 
     el.addEventListener('click', function() { setSelected(el); });
-    el.addEventListener('dblclick', function() {
-      setSelected(el);
-      if (world.alert === 'error') return;
-      callHandle(world, 'onJoin');
-    });
+el.addEventListener('dblclick', function() {
+  setSelected(el);
+  if (world.alert === 'error') return;
+  goWorldLoading(world);
+});
 
     world._el = el;
     return el;
@@ -366,10 +382,10 @@ function t(key, fallback) {
   }
 
   btnPlay.addEventListener('click', function() {
-    if (!selected) return;
-    if (selected.alert === 'error') return;
-    callHandle(selected, 'onJoin');
-  });
+  if (!selected) return;
+  if (selected.alert === 'error') return;
+  goWorldLoading(selected);
+});
 
   btnEdit.addEventListener('click', function() {
     if (!selected) return;
@@ -458,53 +474,58 @@ function t(key, fallback) {
     result    = localStorage.getItem('mc_confirm_result');
     localStorage.removeItem('mc_confirm_action');
     localStorage.removeItem('mc_confirm_result');
-  } catch (e) {
-    alert('[confirm] storage 读取失败: ' + e.message);
-    return;
-  }
-
-
+  } catch (e) { return; }
 
   if (!actionRaw || result !== 'yes') return;
 
   var action;
-  try { action = JSON.parse(actionRaw); } catch (e) {
-    alert('[confirm] JSON.parse 失败: ' + e.message);
-    return;
-  }
+  try { action = JSON.parse(actionRaw); } catch (e) { return; }
   if (!action) return;
 
   setTimeout(function() {
     var folder = action.data && action.data.folder;
+    if (!folder) return;
+
+    var world = null;
+    for (var i = 0; i < WORLDS.length; i++) {
+      if (WORLDS[i] && WORLDS[i].folder === folder) { world = WORLDS[i]; break; }
+    }
+    if (!world) return;
 
     if (action.type === 'deleteWorld') {
-      if (!folder) {
-        alert('[confirm] folder 为空，无法定位世界');
-        return;
-      }
-
-      var world = null;
-      for (var i = 0; i < WORLDS.length; i++) {
-        if (WORLDS[i] && WORLDS[i].folder === folder) { world = WORLDS[i]; break; }
-      }
-
-      if (!world) {
-        var all = WORLDS.map(function(w) { return w && w.folder; }).join(', ');
-        alert('[confirm] 找不到 folder=' + folder + '\n现有 folders: ' + all);
-        return;
-      }
-
       var idx = WORLDS.indexOf(world);
       if (idx >= 0) WORLDS.splice(idx, 1);
       saveWorlds(WORLDS);
       refreshWorlds();
     } else if (action.type === 'recreateWorld') {
-      var w2 = null;
-      for (var j = 0; j < WORLDS.length; j++) {
-        if (WORLDS[j] && WORLDS[j].folder === folder) { w2 = WORLDS[j]; break; }
-      }
-      if (w2) callHandle(w2, 'onRecreate');
+      callHandle(world, 'onRecreate');
     }
+  }, 50);
+})();
+/* ==========================================================
+   从 world_loading.html 返回后，执行 world.onJoin
+   ========================================================== */
+(function checkPendingJoin() {
+  var raw = null;
+  try {
+    raw = localStorage.getItem('mc_pending_join');
+    if (raw) localStorage.removeItem('mc_pending_join');
+  } catch (e) { return; }
+
+  if (!raw) return;
+
+  var info;
+  try { info = JSON.parse(raw); } catch (e) { return; }
+  if (!info || info.type !== 'world' || !info.folder) return;
+
+  var world = null;
+  for (var i = 0; i < WORLDS.length; i++) {
+    if (WORLDS[i] && WORLDS[i].folder === info.folder) { world = WORLDS[i]; break; }
+  }
+  if (!world) return;
+
+  setTimeout(function() {
+    callHandle(world, 'onJoin');
   }, 50);
 })();
   refreshWorlds();

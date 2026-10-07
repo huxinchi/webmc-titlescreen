@@ -807,6 +807,59 @@ setTimeout(function() {
   }
 }, 50);
 })();
+/* ==========================================================
+   从 world_loading.html 返回后，执行 server.onJoin
+   ========================================================== */
+(function checkPendingJoin() {
+  var raw = null;
+  try {
+    raw = localStorage.getItem('mc_pending_join');
+    if (raw) localStorage.removeItem('mc_pending_join');
+  } catch (e) { return; }
+
+  if (!raw) return;
+
+  var info;
+  try { info = JSON.parse(raw); } catch (e) { return; }
+  if (!info || info.type !== 'server') return;
+
+  setTimeout(function() {
+    var target = null;
+
+    /* 1. 按 id 找 mc_servers */
+    if (info.id) {
+      for (var i = 0; i < SERVERS.length; i++) {
+        if (SERVERS[i] && SERVERS[i].id === info.id) { target = SERVERS[i]; break; }
+      }
+    }
+
+    /* 2. 按 addr 找 presets */
+    if (!target && info.addr && window.mcMatchPreset) {
+      var m = window.mcMatchPreset(info.addr);
+      if (m && m.preset) target = m.preset;
+    }
+
+    /* 3. 按 addr 找 mc_servers */
+    if (!target && info.addr) {
+      var a1 = String(info.addr).toLowerCase();
+      if (a1.indexOf(':') < 0) a1 += ':25565';
+      for (var j = 0; j < SERVERS.length; j++) {
+        var s = SERVERS[j];
+        if (!s) continue;
+        var a2 = String(s.ip || s.address || '').toLowerCase();
+        if (a2.indexOf(':') < 0) a2 += ':25565';
+        if (a2 === a1) { target = s; break; }
+      }
+    }
+
+    if (!target) return;
+
+    if (typeof target.onJoin === 'function') {
+      try { target.onJoin.call(target); }
+      catch (e) { console.error('[multiplayer] onJoin', e); }
+    }
+  }, 50);
+})();
   /* ==========================================================
      启动
      ========================================================== */

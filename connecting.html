@@ -355,24 +355,38 @@ function finish() {
   var target = resolveJoinTarget();
 
   if (!target) {
-    /* 找不到 handle → 用默认错误跳断连 */
     abortWithError(DEFAULT_ERROR);
     return;
   }
 
+  /* 记住"待执行的 join"，world_loading 结束后回 multiplayer 执行 */
   try {
-    target.onJoin.call(target);
+    localStorage.setItem('mc_pending_join', JSON.stringify({
+      type: 'server',
+      id:   id   || '',
+      addr: addr || ''
+    }));
   } catch (e) {
-    console.error('[connecting] onJoin', e);
-    abortWithError(DEFAULT_ERROR);
+    /* 兜底：直接走 handle */
+    try { target.onJoin.call(target); } catch (err) {}
+    setTimeout(function() { if (!aborted) goBack(); }, 500);
     return;
   }
 
-  setTimeout(function() {
-    if (!aborted) goBack();
-  }, 500);
-}
+  /* 跳 world_loading 做地形加载 —— jumpNoPush 不把 connecting 压栈 */
+  var qs = [];
+  if (id)   qs.push('sid='    + encodeURIComponent(id));
+  if (addr) qs.push('addr='   + encodeURIComponent(addr));
+  qs.push('return=' + encodeURIComponent('multiplayer.html'));
 
+  var url = 'world_loading.html?' + qs.join('&');
+
+  if (window.mcBack && typeof window.mcBack.jumpNoPush === 'function') {
+    window.mcBack.jumpNoPush(url);
+  } else {
+    location.href = url;
+  }
+}
   /* ==========================================================
      取消 / 回落
      ========================================================== */
