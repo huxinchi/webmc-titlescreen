@@ -17,6 +17,7 @@ var SCRIPTS = [
   'js/cycle_button.js',
   'js/option_list.js',
   'js/object_select_list.js',
+  'js/dialog.js',
   'js/btn_back.js',
   'js/uiscale.js',
   'js/keybinds.js',

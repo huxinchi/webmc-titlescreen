@@ -716,20 +716,24 @@
      - 标题：pack.incompatible.confirm.title
      - 正文：PackCompatibility.getConfirmation() → pack.incompatible.confirm.<old|new|unknown>
      ========================================================== */
-  function confirmIncompat(id, onConfirm) {
-    var pack   = getPack(id);
-    var compat = (pack && pack.compatibility) || 'unknown';
+function confirmIncompat(id, onConfirm) {
+  var pack   = getPack(id);
+  var compat = (pack && pack.compatibility) || 'unknown';
 
-    var titleKey = 'pack.incompatible.confirm.title';
-    var title = t(titleKey);
-    if (title === titleKey) title = 'Are you sure you want to load this pack?';
+  var titleKey = 'pack.incompatible.confirm.title';
+  var title = t(titleKey);
+  if (title === titleKey) title = 'Are you sure you want to load this pack?';
 
-    var reasonKey = 'pack.incompatible.confirm.' + compat;
-    var reason = t(reasonKey);
-    if (reason === reasonKey) reason = 'This pack may not work correctly.';
+  var reasonKey = 'pack.incompatible.confirm.' + compat;
+  var reason = t(reasonKey);
+  if (reason === reasonKey) reason = 'This pack may not work correctly.';
 
-    if (window.confirm(title + '\n\n' + reason)) onConfirm();
-  }
+  window.mcDialog.confirm({
+    title:   title,
+    message: reason,
+    onYes:   onConfirm
+  });
+}
 
   function selectPack(id) {
     if (selectedSet[id]) return;
@@ -780,20 +784,25 @@
   }
   updateDeleteBtn();
 
-  deleteBtn.addEventListener('click', function() {
-    if (!currentSelected || !isUserPack(currentSelected)) return;
-    var pack = getPack(currentSelected);
-    var displayName = (pack && pack.title) || currentSelected;
-    if (!window.confirm('Delete "' + displayName + '"?')) return;
+deleteBtn.addEventListener('click', function() {
+  if (!currentSelected || !isUserPack(currentSelected)) return;
+  var pack = getPack(currentSelected);
+  var displayName = (pack && pack.title) || currentSelected;
 
-    window.mcResourcePacks.deleteUserPack(currentSelected).then(function() {
-      selectedIds = selectedIds.filter(function(id) { return id !== currentSelected; });
-      refreshSet();
-      currentSelected = null;
-      focusedList = null;
-      reloadAll();
-    });
+  window.mcDialog.confirm({
+    title:   'Delete pack',
+    message: 'Delete "' + displayName + '"?',
+    onYes: function() {
+      window.mcResourcePacks.deleteUserPack(currentSelected).then(function() {
+        selectedIds = selectedIds.filter(function(id) { return id !== currentSelected; });
+        refreshSet();
+        currentSelected = null;
+        focusedList = null;
+        reloadAll().then(persistSelection);
+      });
+    }
   });
+});
 
   searchEl.addEventListener('input', render);
 
@@ -881,32 +890,38 @@
      拖放拒绝提示 —— 对齐 gui.fileDropFailure.title / detail
      ========================================================== */
   function showDropFailure(rejectedCount) {
-    var titleKey  = 'gui.fileDropFailure.title';
-    var detailKey = 'gui.fileDropFailure.detail';
+  var titleKey  = 'gui.fileDropFailure.title';
+  var detailKey = 'gui.fileDropFailure.detail';
 
-    var title = t(titleKey);
-    if (title === titleKey) title = 'Failed to add files';
+  var title = t(titleKey);
+  if (title === titleKey) title = 'Failed to add files';
 
-    var detail = t(detailKey);
-    if (detail === detailKey) detail = 'Rejected %s files';
-    detail = detail.indexOf('%s') >= 0
-      ? detail.replace('%s', String(rejectedCount))
-      : detail + ' (' + rejectedCount + ')';
+  var detail = t(detailKey);
+  if (detail === detailKey) detail = 'Rejected %s files';
+  detail = detail.indexOf('%s') >= 0
+    ? detail.replace('%s', String(rejectedCount))
+    : detail + ' (' + rejectedCount + ')';
 
-    window.alert(title + '\n\n' + detail);
-  }
+  window.mcDialog.alert({
+    title:   title,
+    message: detail
+  });
+}
 
   /* ==========================================================
      导入处理
      ========================================================== */
-  function handleImportPromise(promise, kind) {
-    promise.then(function(id) {
-      return reloadAll();
-    }).catch(function(err) {
-      var msg = (err && err.message) || String(err);
-      window.alert('Import failed: ' + msg);
+function handleImportPromise(promise, kind) {
+  promise.then(function(id) {
+    return reloadAll();
+  }).catch(function(err) {
+    var msg = (err && err.message) || String(err);
+    window.mcDialog.alert({
+      title:   'Import failed',
+      message: msg
     });
-  }
+  });
+}
 
   function importFiles(fileList) {
     if (!fileList || !fileList.length) return;
@@ -952,13 +967,16 @@
         return window.mcResourcePacks.importFile(f);
       });
     });
-    chain.then(function() {
-      reloadAll();
-      if (rejected > 0) showDropFailure(rejected);
-    }).catch(function(err) {
-      var msg = (err && err.message) || String(err);
-      window.alert('Import failed: ' + msg);
-    });
+chain.then(function() {
+  reloadAll();
+  if (rejected > 0) showDropFailure(rejected);
+}).catch(function(err) {
+  var msg = (err && err.message) || String(err);
+  window.mcDialog.alert({
+    title:   'Import failed',
+    message: msg
+  });
+});
   }
 
   /* ==========================================================

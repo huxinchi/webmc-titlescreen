@@ -7,9 +7,13 @@
 /* 全局变量 / 字体 / 基础重置 */
 @import url('main.css');
 
+
 /* 控件 */
 @import url('buttons.css');
 @import url('textfield.css');
 @import url('slider.css');
 @import url('object_select_list.css');
 @import url('option_list.css');
+
+/* 通用组件 */
+@import url('dialog.css');

@@ -1,0 +1,76 @@
+/* ==========================================================
+   Dialog —— 通用对话框 UI
+   对齐 ConfirmScreen / AlertScreen 的视觉
+   遮罩 + 居中盒子 + 标题 + 正文 + 按钮行
+   ========================================================== */
+
+#mc-dialog-root {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 对齐原版 renderTransparentBackground 的渐变遮罩 */
+  background: linear-gradient(
+    to bottom,
+    rgba(16, 16, 16, 0.75) 0%,
+    rgba(16, 16, 16, 0.81) 100%
+  );
+  /* 对齐原版 menuBackgroundBlurriness 的模糊效果 */
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  pointer-events: auto;
+}
+
+#mc-dialog-root.mc-dialog-hidden { display: none; }
+
+.mc-dialog-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 24px;
+  min-width: 200px;
+  max-width: min(500px, calc(100vw - 40px));
+  box-sizing: border-box;
+  font-family: 'Minecraft', monospace;
+  color: #ffffff;
+}
+
+/* 变体：数据包（未来扩展） */
+.mc-dialog-box.mc-dialog-variant-data {
+  /* 占位 */
+}
+
+.mc-dialog-title {
+  font-family: 'Minecraft', monospace;
+  font-size: var(--font-size, 10px);
+  font-weight: bold;
+  text-align: center;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #3f3f3f;
+  user-select: none;
+}
+
+.mc-dialog-message {
+  font-family: 'Minecraft', monospace;
+  font-size: var(--font-size, 10px);
+  text-align: center;
+  color: #BABABE;
+  text-shadow: 1px 1px 0 #1a1a1a;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  user-select: none;
+}
+
+.mc-dialog-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding-top: 8px;
+  flex-wrap: wrap;
+}
