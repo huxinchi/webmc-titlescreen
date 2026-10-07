@@ -336,7 +336,7 @@
     return sanitized;
   }
 
-  var state = {
+var state = {
   name: 'New World',
   gameMode: 'SURVIVAL',
   difficulty: 'NORMAL',
@@ -348,7 +348,8 @@
   targetFolder: '',
   flatPreset: null,
   flatPresetParsed: null,
-  singleBiome: null,            /* ← 新增 */
+  singleBiome: null,
+  experiments: null,            /* ← 新增 */
   listeners: []
 };
 
@@ -712,22 +713,36 @@ row1.appendChild(customizeBtn);
     var wrap = document.getElementById('cw-tab-more');
     wrap.innerHTML = '';
 
-    function addTipBtn(key, tipTitle) {
-      var b = makeBtn('mcbtn-210');
-      b.setAttribute('data-i18n', key);
-      b.textContent = t(key);
-      b.addEventListener('click', function() {
-        window.mcDialog.alert({
-          title:   t(key),
-          message: tipTitle + ' is not available in the web edition.'
-        });
-      });
-      wrap.appendChild(b);
-    }
+ function addTipBtn(key, tipTitle) {
+  var b = makeBtn('mcbtn-210');
+  b.setAttribute('data-i18n', key);
+  b.textContent = t(key);
+  b.addEventListener('click', function() {
+    window.mcDialog.alert({
+      title:   t(key),
+      message: tipTitle + ' is not available in the web edition.'
+    });
+  });
+  wrap.appendChild(b);
+}
 
-    addTipBtn('selectWorld.gameRules', 'Game rules editing');
-    addTipBtn('selectWorld.experiments', 'Experiments');
-    addTipBtn('selectWorld.dataPacks', 'Data packs');
+function addNavBtn(key, url) {
+  var b = makeBtn('mcbtn-210');
+  b.setAttribute('data-i18n', key);
+  b.textContent = t(key);
+  b.addEventListener('click', function() {
+    if (window.mcBack && typeof window.mcBack.jump === 'function') {
+      window.mcBack.jump(url);
+    } else {
+      location.href = url;
+    }
+  });
+  wrap.appendChild(b);
+}
+
+addTipBtn('selectWorld.gameRules', 'Game rules editing');
+addNavBtn('selectWorld.experiments', 'experiments.html');
+addTipBtn('selectWorld.dataPacks', 'Data packs');
   }
 
   /* ==========================================================
@@ -818,7 +833,7 @@ row1.appendChild(customizeBtn);
       join:       'join',
       alert:      '',
 
- gameMode:           state.gameMode,
+gameMode:           state.gameMode,
 difficulty:         state.difficulty,
 allowCommands:      state.getAllowCommands(),
 seed:               state.seed,
@@ -828,6 +843,7 @@ worldType:          state.worldType,
 flatPreset:         state.flatPreset || null,
 flatPresetParsed:   state.flatPresetParsed || null,
 singleBiome:        state.singleBiome || null,
+experiments:        state.experiments || null,
 
       onUpdate: function() {
         var d = new Date();
@@ -872,22 +888,34 @@ function boot() {
     }
   } catch (e) {}
 
-  /* 从 create_buffet_world.html 返回 → 应用单生物群系 */
-  try {
-    var biomeRaw = localStorage.getItem('mc_biome_result');
-    if (biomeRaw) {
-      localStorage.removeItem('mc_biome_result');
-      var bObj = JSON.parse(biomeRaw);
-      if (bObj && bObj.biome) {
-        state.singleBiome = bObj.biome;
-        if (state.worldType !== 'single_biome_surface') {
-          state.worldType = 'single_biome_surface';
-        }
+/* 从 create_buffet_world.html 返回 → 应用单生物群系 */
+try {
+  var biomeRaw = localStorage.getItem('mc_biome_result');
+  if (biomeRaw) {
+    localStorage.removeItem('mc_biome_result');
+    var bObj = JSON.parse(biomeRaw);
+    if (bObj && bObj.biome) {
+      state.singleBiome = bObj.biome;
+      if (state.worldType !== 'single_biome_surface') {
+        state.worldType = 'single_biome_surface';
       }
     }
-  } catch (e) {}
+  }
+} catch (e) {}
 
-  state.onChanged();
+/* 从 experiments / confirm_experimental 返回 → 应用实验性内容 */
+try {
+  var expRaw = localStorage.getItem('mc_experiments_result');
+  if (expRaw) {
+    localStorage.removeItem('mc_experiments_result');
+    var expObj = JSON.parse(expRaw);
+    if (expObj) {
+      state.experiments = expObj;
+    }
+  }
+} catch (e) {}
+
+state.onChanged();
 }
 
   if (window.i18n && window.i18n.ready) {

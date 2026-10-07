@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Experiments</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<link rel="stylesheet" href="css/switch_grid.css">
+<link rel="stylesheet" href="css/tooltip.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .exp-screen {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .exp-header {
+    flex: 0 0 33px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+  .exp-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .exp-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 8px;
+    box-sizing: border-box;
+  }
+
+  /* INFO 红色警告，宽 310，下方 15px padding */
+  .exp-info {
+    width: 310px;
+    max-width: 100%;
+    margin-bottom: 15px;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1.4;
+    color: #FF5555;
+    text-shadow: 1px 1px 0 #3f0000;
+    text-align: center;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: none;
+  }
+
+  .exp-footer {
+    flex: 0 0 33px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-sizing: border-box;
+  }
+</style>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="exp-screen">
+
+  <div class="exp-header">
+    <div class="exp-title" id="exp-title" data-i18n="selectWorld.experiments">Experiments</div>
+  </div>
+
+  <div class="exp-content">
+    <div class="exp-info" id="exp-info" data-i18n="selectWorld.experiments.info"></div>
+    <div id="exp-grid-wrap"></div>
+  </div>
+
+  <div class="exp-footer">
+    <button class="mcbtn mcbtn-150" id="exp-done"   data-i18n="gui.done">Done</button>
+    <button class="mcbtn mcbtn-150" id="exp-cancel" data-i18n="gui.cancel">Cancel</button>
+  </div>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var FALLBACKS = {
+    'selectWorld.experiments':       'Experiments',
+    'selectWorld.experiments.info':  'Experiments may lead to unexpected behavior and may break your world. Make backups!',
+
+    'gui.done':   'Done',
+    'gui.cancel': 'Cancel',
+
+    'dataPack.trade_rebalance.name':            'Trade Rebalance',
+    'dataPack.trade_rebalance.description':     'Adjusts villager trades for balance.',
+    'dataPack.redstone_experiments.name':       'Redstone Experiments',
+    'dataPack.redstone_experiments.description':'New redstone behaviors and blocks.',
+    'dataPack.minecart_improvements.name':      'Minecart Improvements',
+    'dataPack.minecart_improvements.description':'New minecart physics and behaviors.'
+  };
+
+  function t(key, fallback) {
+    var v = (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+    if (v === key) {
+      if (FALLBACKS[key] != null) return FALLBACKS[key];
+      if (fallback != null) return fallback;
+    }
+    return v;
+  }
+
+  /* ==========================================================
+     实验性数据包列表
+     复刻原版：从 PackRepository 里筛 PackSource.FEATURE 的包
+     网页版硬编码 3 个原版内置实验包
+     ========================================================== */
+  var EXPERIMENTAL_PACKS = [
+    {
+      id:       'trade_rebalance',
+      nameKey:  'dataPack.trade_rebalance.name',
+      descKey:  'dataPack.trade_rebalance.description',
+      features: ['trade_rebalance']
+    },
+    {
+      id:       'redstone_experiments',
+      nameKey:  'dataPack.redstone_experiments.name',
+      descKey:  'dataPack.redstone_experiments.description',
+      features: ['redstone_experiments']
+    },
+    {
+      id:       'minecart_improvements',
+      nameKey:  'dataPack.minecart_improvements.name',
+      descKey:  'dataPack.minecart_improvements.description',
+      features: ['minecart_improvements']
+    }
+  ];
+
+  /* 状态：id → boolean */
+/* ==========================================================
+   双状态模型（复刻原版 PackRepository + ExperimentsScreen.packs）
+     mc_experiments_current —— 已确认状态（等价 PackRepository）
+     mc_experiments_editing —— 编辑中状态（等价 packs 字段）
+   ========================================================== */
+var selection = {};
+EXPERIMENTAL_PACKS.forEach(function(p) { selection[p.id] = false; });
+
+function loadJSON(key) {
+  try {
+    var raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function saveJSON(key, obj) {
+  try { localStorage.setItem(key, JSON.stringify(obj)); } catch (e) {}
+}
+
+function removeKey(key) {
+  try { localStorage.removeItem(key); } catch (e) {}
+}
+
+/* 优先读"编辑中"；没有则读"已确认"；都没有则全关 */
+var initial = loadJSON('mc_experiments_editing')
+           || loadJSON('mc_experiments_current');
+
+if (initial) {
+  EXPERIMENTAL_PACKS.forEach(function(p) {
+    if (typeof initial[p.id] === 'boolean') selection[p.id] = initial[p.id];
+  });
+}
+
+/* 勾选变化 → 只写"编辑中" */
+function persistEditing() {
+  saveJSON('mc_experiments_editing', selection);
+}
+
+  /* ==========================================================
+     UI
+     ========================================================== */
+  var wrapEl   = document.getElementById('exp-grid-wrap');
+  var infoEl   = document.getElementById('exp-info');
+  var doneBtn  = document.getElementById('exp-done');
+  var cancelBtn = document.getElementById('exp-cancel');
+
+  function applyI18n() {
+    infoEl.textContent = t('selectWorld.experiments.info');
+    doneBtn.textContent = t('gui.done');
+    cancelBtn.textContent = t('gui.cancel');
+  }
+
+  function buildGrid() {
+    var grid = new window.mcWidgets.SwitchGrid(310, {
+      infoUnderneath: true,
+      maxInfoRows:    2,
+      rowSpacing:     4
+    });
+
+    EXPERIMENTAL_PACKS.forEach(function(p) {
+      grid.add({
+        label: p.nameKey,
+        info:  p.descKey,
+        get:   function() { return selection[p.id]; },
+        set:   function(v) {
+  selection[p.id] = !!v;
+  persistEditing();
+}
+      });
+    });
+
+    wrapEl.innerHTML = '';
+    wrapEl.appendChild(grid.el);
+    grid.refreshStates();
+  }
+
+  /* ==========================================================
+     提交
+     ========================================================== */
+  function collectFeatures() {
+    var enabled = [];
+    var features = {};
+    EXPERIMENTAL_PACKS.forEach(function(p) {
+      if (selection[p.id]) {
+        enabled.push(p.id);
+        p.features.forEach(function(f) { features[f] = true; });
+      }
+    });
+    return {
+      enabledPacks: enabled,
+      features: Object.keys(features)
+    };
+  }
+
+function doDone() {
+  var data = collectFeatures();
+
+  if (data.features.length > 0) {
+    /* 有实验性 feature → 跳确认页
+       pending 数据供 confirm 读取（用 pending 作为"待确认"标记）
+       用 jumpNoPush：不把 experiments 压栈，confirm 的 back() 才会回 create_world */
+    saveJSON('mc_experiments_pending', data);
+
+    var url = 'confirm_experimental.html';
+    if (window.mcBack && typeof window.mcBack.jumpNoPush === 'function') {
+      window.mcBack.jumpNoPush(url);
+    } else {
+      location.href = url;
+    }
+  } else {
+    /* 无实验性 feature → 直接"提交" */
+    commit();
+    goBackToCreateWorld();
+  }
+}
+
+/* 提交：editing → current，并写 result */
+function commit() {
+  var data = collectFeatures();
+  saveJSON('mc_experiments_current', selection);
+  removeKey('mc_experiments_editing');
+  saveJSON('mc_experiments_result', data);
+  removeKey('mc_experiments_pending');
+}
+  function goBackToCreateWorld() {
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('create_world.html');
+    } else {
+      location.href = 'create_world.html';
+    }
+  }
+
+function doCancel() {
+  /* 丢弃"编辑中"状态，保留"已确认"状态 */
+  removeKey('mc_experiments_editing');
+  goBackToCreateWorld();
+}
+
+  doneBtn.addEventListener('click', doDone);
+  cancelBtn.addEventListener('click', doCancel);
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      doCancel();
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  function boot() {
+    applyI18n();
+    buildGrid();
+  }
+
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(boot);
+  } else {
+    boot();
+  }
+  document.addEventListener('i18n-ready', function() {
+    applyI18n();
+    buildGrid();
+  }, false);
+
+})();
+</script>
+
+</body>
+</html>

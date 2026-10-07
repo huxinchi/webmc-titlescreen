@@ -10,28 +10,29 @@
 
   /* ==========================================================
      SwitchGrid —— "标签 + 44×20 开关按钮"
-     对齐 SwitchGrid.java：
-       - 每行：label 左对齐，按钮右对齐（44×20）
-       - 行间距 4px
-       - info 挂到按钮 tooltip（原版 WorldTab 未启用 withInfoUnderneath）
+     对齐 SwitchGrid.java
 
      用法：
-       var grid = new mcWidgets.SwitchGrid(310);
-       grid.add({
-         label:      'selectWorld.mapFeatures',
-         info:       'selectWorld.mapFeatures.info',
-         get:        function() { return state.generateStructures; },
-         set:        function(v) { state.generateStructures = v; },
-         activeWhen: function() { return !state.isDebug; }
+       var grid = new mcWidgets.SwitchGrid(310, {
+         infoUnderneath: true,   // info 显示在下方（默认 false = tooltip）
+         maxInfoRows:    2,      // info 最多几行
+         rowSpacing:     4       // 行间距
        });
+       grid.add({ label, info, get, set, activeWhen });
        container.appendChild(grid.el);
        grid.refreshStates();
      ========================================================== */
-  function SwitchGrid(width) {
-    this.width = width || 310;
+  function SwitchGrid(width, opts) {
+    opts = opts || {};
+    this.width          = width || 310;
+    this.rowSpacing     = (typeof opts.rowSpacing === 'number') ? opts.rowSpacing : 4;
+    this.infoUnderneath = !!opts.infoUnderneath;
+    this.maxInfoRows    = (typeof opts.maxInfoRows === 'number') ? opts.maxInfoRows : 2;
+
     this.el = document.createElement('div');
     this.el.className = 'mc-switch-grid';
     this.el.style.width = this.width + 'px';
+    this.el.style.gap   = this.rowSpacing + 'px';
     this.items = [];
 
     var self = this;
@@ -60,12 +61,24 @@
     row.appendChild(btn);
 
     wrap.appendChild(row);
-    this.el.appendChild(wrap);
 
-    /* info → 按钮 tooltip（对齐原版 buttonBuilder.withTooltip） */
-    if (opts.info) {
+    /* info 行 / tooltip */
+    var useUnderneath = (typeof opts.infoUnderneath === 'boolean')
+      ? opts.infoUnderneath
+      : this.infoUnderneath;
+
+    var infoEl = null;
+    if (opts.info && useUnderneath) {
+      infoEl = document.createElement('div');
+      infoEl.className = 'mc-switch-info';
+      infoEl.textContent = t(opts.info);
+      infoEl.style.maxHeight = (this.maxInfoRows * 12) + 'px';
+      wrap.appendChild(infoEl);
+    } else if (opts.info) {
       window.mcTooltip.attach(btn, function() { return t(opts.info); });
     }
+
+    this.el.appendChild(wrap);
 
     var getState   = opts.get || function() { return false; };
     var setState   = opts.set || function() {};
@@ -73,9 +86,7 @@
 
     function refresh() {
       var val = !!getState();
-      var onText  = t('options.on');
-      var offText = t('options.off');
-      btn.textContent = val ? onText : offText;
+      btn.textContent = val ? t('options.on') : t('options.off');
       btn.disabled = !activeWhen();
     }
 
@@ -88,7 +99,7 @@
 
     refresh();
 
-    this.items.push({ refresh: refresh, labelEl: labelEl, opts: opts });
+    this.items.push({ refresh: refresh, labelEl: labelEl, infoEl: infoEl, opts: opts });
     return this;
   };
 
@@ -102,6 +113,7 @@
     for (var i = 0; i < this.items.length; i++) {
       var it = this.items[i];
       if (it.opts.label) it.labelEl.textContent = t(it.opts.label);
+      if (it.opts.info && it.infoEl) it.infoEl.textContent = t(it.opts.info);
       it.refresh();
     }
   };

@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Confirm Experimental Features</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .cef-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  /* 主屏：GridLayout 2 列 spacing 10，rowSpacing 20，居中 */
+  .cef-main {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+  }
+
+  .cef-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    text-align: center;
+    user-select: none;
+  }
+
+  .cef-message {
+    max-width: 310px;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1.4;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    text-align: center;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: none;
+  }
+
+  .cef-btn-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  /* 子屏（Details） */
+  .cef-details {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: none;
+    flex-direction: column;
+    box-sizing: border-box;
+  }
+  .cef-details.active { display: flex; }
+
+  .cef-details-header {
+    flex: 0 0 33px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .cef-details-title {
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+  }
+
+  .cef-details-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-image: url('../assets/background/menu_list_background.png');
+    background-repeat: repeat;
+    background-size: 32px 32px;
+    image-rendering: pixelated;
+  }
+
+  /* PackList：行高 = (9+2)*3 = 33 */
+  .cef-pack-entry {
+    width: 75%;
+    max-width: 75%;
+    margin: 0 auto;
+    padding: 4px 6px;
+    box-sizing: border-box;
+    font-family: 'Minecraft', monospace;
+    font-size: var(--font-size, 10px);
+    line-height: 1.4;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+  }
+
+  .cef-pack-name {
+    font-weight: bold;
+    color: #ffffff;
+  }
+
+  .cef-pack-msg {
+    color: #ffffff;
+    margin-top: 4px;
+  }
+
+  .cef-pack-empty {
+    text-align: center;
+    padding: 20px;
+    color: #808080;
+  }
+
+  .cef-details-footer {
+    flex: 0 0 33px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+</style>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="cef-root">
+
+  <!-- 主屏 -->
+  <div class="cef-main" id="cef-main">
+    <div class="cef-title" id="cef-title" data-i18n="selectWorld.experimental.title">Warning!</div>
+
+    <div class="cef-message" id="cef-message" data-i18n="selectWorld.experimental.message"></div>
+
+    <button class="mcbtn mcbtn-150" id="cef-details-btn" data-i18n="selectWorld.experimental.details">Details</button>
+
+    <div class="cef-btn-row">
+      <button class="mcbtn mcbtn-150" id="cef-proceed" data-i18n="gui.proceed">Proceed</button>
+      <button class="mcbtn mcbtn-150" id="cef-back"    data-i18n="gui.back">Back</button>
+    </div>
+  </div>
+
+  <!-- 子屏：Details -->
+  <div class="cef-details" id="cef-details">
+    <div class="cef-details-header">
+      <div class="cef-details-title" id="cef-details-title" data-i18n="selectWorld.experimental.details.title">Experimental Features</div>
+    </div>
+    <div class="cef-details-content mc-scroll" id="cef-pack-list"></div>
+    <div class="cef-details-footer">
+      <button class="mcbtn mcbtn-150" id="cef-details-back" data-i18n="gui.back">Back</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var FALLBACKS = {
+    'selectWorld.experimental.title':        'Warning!',
+    'selectWorld.experimental.message':      'You are about to enable experimental features. This may break your world or cause other issues.',
+    'selectWorld.experimental.details':      'Details',
+    'selectWorld.experimental.details.title':'Experimental Features',
+    'selectWorld.experimental.details.entry':'Adds the %s feature(s)',
+    'gui.proceed':                           'Proceed',
+    'gui.back':                              'Back',
+
+    'dataPack.trade_rebalance.name':            'Trade Rebalance',
+    'dataPack.redstone_experiments.name':       'Redstone Experiments',
+    'dataPack.minecart_improvements.name':      'Minecart Improvements'
+  };
+
+  function t(key, fallback) {
+    var v = (window.i18n && window.i18n.t) ? window.i18n.t(key) : key;
+    if (v === key) {
+      if (FALLBACKS[key] != null) return FALLBACKS[key];
+      if (fallback != null) return fallback;
+    }
+    return v;
+  }
+
+  /* ==========================================================
+     读 pending 数据（从 experiments.html 传来）
+     ========================================================== */
+  var pending = { enabledPacks: [], features: [] };
+  try {
+    var raw = localStorage.getItem('mc_experiments_pending');
+    if (raw) {
+      var obj = JSON.parse(raw);
+      if (obj) {
+        pending.enabledPacks = Array.isArray(obj.enabledPacks) ? obj.enabledPacks : [];
+        pending.features     = Array.isArray(obj.features)     ? obj.features     : [];
+      }
+    }
+  } catch (e) {}
+
+  /* 每个实验包 id → 对应的 i18n name key */
+  var PACK_NAME_KEY = {
+    'trade_rebalance':       'dataPack.trade_rebalance.name',
+    'redstone_experiments':  'dataPack.redstone_experiments.name',
+    'minecart_improvements': 'dataPack.minecart_improvements.name'
+  };
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var mainEl       = document.getElementById('cef-main');
+  var detailsEl    = document.getElementById('cef-details');
+  var titleEl      = document.getElementById('cef-title');
+  var messageEl    = document.getElementById('cef-message');
+  var detailsBtn   = document.getElementById('cef-details-btn');
+  var proceedBtn   = document.getElementById('cef-proceed');
+  var backBtn      = document.getElementById('cef-back');
+  var detailsTitle = document.getElementById('cef-details-title');
+  var packListEl   = document.getElementById('cef-pack-list');
+  var detailsBack  = document.getElementById('cef-details-back');
+
+  /* ==========================================================
+     i18n
+     ========================================================== */
+  function applyI18n() {
+    titleEl.textContent       = t('selectWorld.experimental.title');
+    messageEl.textContent     = t('selectWorld.experimental.message');
+    detailsBtn.textContent    = t('selectWorld.experimental.details');
+    proceedBtn.textContent    = t('gui.proceed');
+    backBtn.textContent       = t('gui.back');
+    detailsTitle.textContent  = t('selectWorld.experimental.details.title');
+    detailsBack.textContent   = t('gui.back');
+    renderDetails();
+  }
+
+  /* ==========================================================
+     详情列表
+     ========================================================== */
+  function renderDetails() {
+    packListEl.innerHTML = '';
+
+    if (!pending.enabledPacks.length) {
+      var empty = document.createElement('div');
+      empty.className = 'cef-pack-empty';
+      empty.textContent = '...';
+      packListEl.appendChild(empty);
+      return;
+    }
+
+    pending.enabledPacks.forEach(function(packId) {
+      var nameKey = PACK_NAME_KEY[packId];
+      var packName = nameKey ? t(nameKey) : packId;
+
+      /* 该 pack 的 features（从 EXPERIMENTAL_PACKS 反查） */
+      var feats = [];
+      /* 从 pending.features 里列出——这里简化，直接列全部 features */
+      /* 更好：每个 pack 只列它自己的，从 experiments.html 的映射继承
+         简化处理：显示整个 features 里非 vanilla 的部分 */
+      if (packId === 'trade_rebalance')      feats = ['trade_rebalance'];
+      if (packId === 'redstone_experiments') feats = ['redstone_experiments'];
+      if (packId === 'minecart_improvements')feats = ['minecart_improvements'];
+
+      var entry = document.createElement('div');
+      entry.className = 'cef-pack-entry';
+
+      var nameEl = document.createElement('div');
+      nameEl.className = 'cef-pack-name';
+      nameEl.textContent = packName;
+      entry.appendChild(nameEl);
+
+      var msgEl = document.createElement('div');
+      msgEl.className = 'cef-pack-msg';
+      var tpl = t('selectWorld.experimental.details.entry', 'Adds the %s feature(s)');
+      var msg = tpl.indexOf('%s') >= 0 ? tpl.replace('%s', feats.join(', ')) : tpl + ' ' + feats.join(', ');
+      msgEl.textContent = msg;
+      entry.appendChild(msgEl);
+
+      packListEl.appendChild(entry);
+    });
+  }
+
+  /* ==========================================================
+     事件
+     ========================================================== */
+  detailsBtn.addEventListener('click', function() {
+    mainEl.style.display = 'none';
+    detailsEl.classList.add('active');
+  });
+
+  detailsBack.addEventListener('click', function() {
+    detailsEl.classList.remove('active');
+    mainEl.style.display = '';
+  });
+
+  proceedBtn.addEventListener('click', function() {
+  /* 复刻原版：Proceed 时把"编辑中"提交为"已确认" */
+
+  /* 1. editing → current */
+  try {
+    var editing = localStorage.getItem('mc_experiments_editing');
+    if (editing) {
+      localStorage.setItem('mc_experiments_current', editing);
+      localStorage.removeItem('mc_experiments_editing');
+    }
+  } catch (e) {}
+
+  /* 2. 写 result（create_world 会读） */
+  try {
+    localStorage.setItem('mc_experiments_result', JSON.stringify(pending));
+    localStorage.removeItem('mc_experiments_pending');
+  } catch (e) {}
+
+  goBackToCreateWorld();
+});
+
+  backBtn.addEventListener('click', function() {
+    /* 回 experiments，用 jumpNoPush 保持栈不变 */
+    if (window.mcBack && typeof window.mcBack.jumpNoPush === 'function') {
+      window.mcBack.jumpNoPush('experiments.html');
+    } else {
+      location.href = 'experiments.html';
+    }
+  });
+
+  /* Esc = Back 到 experiments */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (detailsEl.classList.contains('active')) {
+        detailsBack.click();
+      } else {
+        backBtn.click();
+      }
+    }
+  }, true);
+
+  function goBackToCreateWorld() {
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('create_world.html');
+    } else {
+      location.href = 'create_world.html';
+    }
+  }
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  function boot() {
+    applyI18n();
+  }
+
+  if (window.i18n && window.i18n.ready) {
+    window.i18n.ready(boot);
+  } else {
+    boot();
+  }
+  document.addEventListener('i18n-ready', applyI18n, false);
+
+})();
+</script>
+
+</body>
+</html>
