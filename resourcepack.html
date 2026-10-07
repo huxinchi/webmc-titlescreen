@@ -112,6 +112,7 @@
   }
 
   .rp-entry {
+    position: relative;
     display: flex;
     align-items: flex-start;
     gap: 2px;
@@ -134,7 +135,6 @@
     border-color: #ffffff;
   }
 
-  /* 不兼容包：整行背景填充（源码 -8978432 = 0xFF770000） */
   .rp-entry.rp-incompatible {
     background-color: #770000;
   }
@@ -190,6 +190,18 @@
     -webkit-box-orient: vertical;
   }
 
+  .rp-user-badge {
+    position: absolute;
+    right: 4px;
+    top: 4px;
+    font-family: 'Minecraft', monospace;
+    font-size: 8px;
+    color: #55FF55;
+    text-shadow: 1px 1px 0 #003300;
+    pointer-events: none;
+    user-select: none;
+  }
+
   .rp-footer {
     flex: 0 0 33px;
     display: flex;
@@ -199,7 +211,30 @@
     box-sizing: border-box;
   }
 
+  .rp-drop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+  }
+  .rp-drop-overlay.visible { display: flex; }
 
+  .rp-drop-overlay-inner {
+    font-family: 'Minecraft', monospace;
+    font-size: 20px;
+    color: #ffffff;
+    text-shadow: 2px 2px 0 #3f3f3f;
+    padding: 24px 48px;
+    border: 3px dashed #ffffff;
+    border-radius: 4px;
+    user-select: none;
+  }
+
+  .rp-hidden-input { display: none; }
 </style>
 </head>
 <body>
@@ -233,11 +268,19 @@
   </div>
 
   <div class="rp-footer">
-    <button class="mcbtn mcbtn-150" id="rp-open-folder" data-i18n="pack.openFolder">Open Pack Folder</button>
-    <a class="mcbtn mcbtn-150 btn-back" id="rp-done" href="options.html" data-i18n="gui.done">Done</a>
+    <button class="mcbtn mcbtn-half" id="rp-load-file" data-i18n="pack.openFolder">Open Pack Folder</button>
+    <button class="mcbtn mcbtn-half" id="rp-delete"    data-i18n="selectServer.delete">Delete</button>
+    <a      class="mcbtn mcbtn-half btn-back" id="rp-done" href="options.html" data-i18n="gui.done">Done</a>
   </div>
 
 </div>
+
+<div class="rp-drop-overlay" id="rp-drop-overlay">
+  <div class="rp-drop-overlay-inner">Drop resource pack here</div>
+</div>
+
+<!-- 不加 accept：某些 OS 下 .js 会被误灰，文件类型在 importFiles 里按扩展名过滤 -->
+<input class="rp-hidden-input" type="file" id="rp-file-input">
 
 <script src="js/main.js"></script>
 <script>
@@ -248,11 +291,14 @@
   var DEFAULT_ICON = 'assets/icon/unknown_pack.png';
   var TINT_CSS     = 'linear-gradient(rgba(144,144,144,0.63), rgba(144,144,144,0.63))';
 
-  var availEl   = document.getElementById('rp-available');
-  var selEl     = document.getElementById('rp-selected');
-  var searchEl  = document.getElementById('rp-search');
-  var folderBtn = document.getElementById('rp-open-folder');
-  var doneBtn   = document.getElementById('rp-done');
+  var availEl     = document.getElementById('rp-available');
+  var selEl       = document.getElementById('rp-selected');
+  var searchEl    = document.getElementById('rp-search');
+  var loadFileBtn = document.getElementById('rp-load-file');
+  var deleteBtn   = document.getElementById('rp-delete');
+  var doneBtn     = document.getElementById('rp-done');
+  var dropOverlay = document.getElementById('rp-drop-overlay');
+  var fileInput   = document.getElementById('rp-file-input');
 
   var allIds          = [];
   var selectedIds     = [];
@@ -298,6 +344,9 @@
   function isFixedPosition(id) {
     var p = getPack(id), e = findIndexEntry(id);
     return !!((p && p.fixedPosition) || (e && e.fixedPosition));
+  }
+  function isUserPack(id) {
+    return window.mcResourcePacks.isUserPack(id);
   }
 
   function canSelect(id)   { return !selectedSet[id]; }
@@ -395,6 +444,7 @@
     if (currentSelected === id && focusedList === listType) return;
     currentSelected = id;
     focusedList = listType;
+    updateDeleteBtn();
     render();
   }
 
@@ -415,7 +465,6 @@
                                  lastActive.nx, lastActive.ny);
     paintIcon(iconEl, iconBgs, sprites, true);
 
-    /* 不兼容包：悬停时恢复"名字换 Incompatible、描述换原因"的状态 */
     var pack = getPack(lastActive.id);
     if (pack && pack.compatibility && pack.compatibility !== 'compatible') {
       var nameEl = el.querySelector('.rp-name');
@@ -477,6 +526,7 @@
     var isIncompat = (compat !== 'compatible');
     var overlayEnabled = !(isFixedPosition(id) && isRequired(id));
     var listType = isSelectedList ? 'selected' : 'available';
+    var isUser = isUserPack(id);
 
     var iconBgs = [];
     if (pack && pack.icon) iconBgs.push('url("' + pack.icon + '")');
@@ -498,7 +548,6 @@
     var info = document.createElement('div');
     info.className = 'rp-info';
 
-    /* 名字：优先 i18n key */
     var titleText;
     if (pack && pack.titleKey) {
       var tv = t(pack.titleKey);
@@ -507,7 +556,6 @@
       titleText = (pack && pack.title) || id;
     }
 
-    /* 描述：优先 i18n key */
     var descText;
     if (pack && pack.descriptionKey) {
       var dv = t(pack.descriptionKey);
@@ -524,13 +572,19 @@
     desc.className = 'rp-desc';
     desc.textContent = descText;
 
-    /* 保存原始文本，供悬停替换后恢复 */
     var origNameText = titleText;
     var origDescText = descText;
 
     info.appendChild(name);
     info.appendChild(desc);
     el.appendChild(info);
+
+    if (isUser) {
+      var badge = document.createElement('div');
+      badge.className = 'rp-user-badge';
+      badge.textContent = 'USER';
+      el.appendChild(badge);
+    }
 
     paintIcon(iconEl, iconBgs, null, false);
 
@@ -543,8 +597,6 @@
       return { x: nx, y: ny, in: inIcon };
     }
 
-    /* 源码 PackEntry.extractContent 里：
-       悬停不兼容包时名字换 pack.incompatible、描述换 pack.incompatibility.<type> */
     function applyIncompatText() {
       if (!isIncompat) return;
       var inc = t('pack.incompatible');
@@ -659,13 +711,24 @@
     return el;
   }
 
-  /* 不兼容包点击前的确认（简化版：用 confirm） */
+  /* ==========================================================
+     不兼容确认框 —— 对齐 TransferableSelectionList.PackEntry.handlePackSelection
+     - 标题：pack.incompatible.confirm.title
+     - 正文：PackCompatibility.getConfirmation() → pack.incompatible.confirm.<old|new|unknown>
+     ========================================================== */
   function confirmIncompat(id, onConfirm) {
-    var pack = getPack(id);
-    var reasonKey = 'pack.incompatible.' + (pack.compatibility || 'unknown');
+    var pack   = getPack(id);
+    var compat = (pack && pack.compatibility) || 'unknown';
+
+    var titleKey = 'pack.incompatible.confirm.title';
+    var title = t(titleKey);
+    if (title === titleKey) title = 'Are you sure you want to load this pack?';
+
+    var reasonKey = 'pack.incompatible.confirm.' + compat;
     var reason = t(reasonKey);
-    if (reason === reasonKey) reason = 'This pack is not compatible with this version.';
-    if (window.confirm(reason + '\n\nAdd anyway?')) onConfirm();
+    if (reason === reasonKey) reason = 'This pack may not work correctly.';
+
+    if (window.confirm(title + '\n\n' + reason)) onConfirm();
   }
 
   function selectPack(id) {
@@ -675,6 +738,7 @@
     currentSelected = id;
     focusedList = 'selected';
     if (lastActive && lastActive.id === id) lastActive.listType = 'selected';
+    updateDeleteBtn();
     render();
   }
 
@@ -685,6 +749,7 @@
     currentSelected = id;
     focusedList = 'available';
     if (lastActive && lastActive.id === id) lastActive.listType = 'available';
+    updateDeleteBtn();
     render();
   }
 
@@ -706,20 +771,39 @@
     render();
   }
 
+  /* ==========================================================
+     删除按钮状态
+     ========================================================== */
+  function updateDeleteBtn() {
+    var canDelete = !!currentSelected && isUserPack(currentSelected);
+    deleteBtn.disabled = !canDelete;
+  }
+  updateDeleteBtn();
+
+  deleteBtn.addEventListener('click', function() {
+    if (!currentSelected || !isUserPack(currentSelected)) return;
+    var pack = getPack(currentSelected);
+    var displayName = (pack && pack.title) || currentSelected;
+    if (!window.confirm('Delete "' + displayName + '"?')) return;
+
+    window.mcResourcePacks.deleteUserPack(currentSelected).then(function() {
+      selectedIds = selectedIds.filter(function(id) { return id !== currentSelected; });
+      refreshSet();
+      currentSelected = null;
+      focusedList = null;
+      reloadAll();
+    });
+  });
+
   searchEl.addEventListener('input', render);
 
   /* ==========================================================
-     键盘导航（对齐源码 PackEntry.keyPressed）
-     - Enter / Space       → keyboardSelection
-     - Shift + ↑ / ↓       → 在 Selected 列表内移动该包
-     - ↑ / ↓（无 Shift）   → 当前列内移动选中项
-     无 ← / → 切列（源码没有）
+     键盘导航（对齐 PackEntry.keyPressed / TransferableSelectionList）
      ========================================================== */
   document.addEventListener('keydown', function(e) {
     var key = e.key;
     var inSearch = (document.activeElement === searchEl);
 
-    /* 搜索框里：只拦 ↑/↓/Enter（失焦进列表导航），其余放行 */
     if (inSearch) {
       if (key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'Enter') return;
       e.preventDefault();
@@ -735,7 +819,6 @@
       else return;
     }
 
-    /* Shift+↑/↓：在 Selected 列表里上下移动该包 */
     if (e.shiftKey && (key === 'ArrowUp' || key === 'ArrowDown')) {
       if (focusedList !== 'selected') return;
       var selIds = getVisibleIds('selected');
@@ -745,7 +828,6 @@
       return;
     }
 
-    /* ↑/↓：当前列内移动选中项 */
     if (key === 'ArrowUp' || key === 'ArrowDown') {
       var ids = getVisibleIds(focusedList);
       if (ids.length === 0) return;
@@ -758,7 +840,6 @@
       return;
     }
 
-    /* Enter / Space：keyboardSelection */
     var ids2 = getVisibleIds(focusedList);
     if (ids2.length === 0) return;
 
@@ -781,11 +862,245 @@
   }, true);
 
   /* ==========================================================
+     重新加载列表（用于导入/删除后刷新）
+     ========================================================== */
+  function reloadAll() {
+    var RP = window.mcResourcePacks;
+    return RP.reload().then(function() {
+      allIds = RP.getIndex().map(function(e) { return e.id; });
+      selectedIds = RP.getSelected().filter(function(id) {
+        return allIds.indexOf(id) >= 0;
+      });
+      refreshSet();
+      render();
+      updateDeleteBtn();
+    });
+  }
+
+  /* ==========================================================
+     拖放拒绝提示 —— 对齐 gui.fileDropFailure.title / detail
+     ========================================================== */
+  function showDropFailure(rejectedCount) {
+    var titleKey  = 'gui.fileDropFailure.title';
+    var detailKey = 'gui.fileDropFailure.detail';
+
+    var title = t(titleKey);
+    if (title === titleKey) title = 'Failed to add files';
+
+    var detail = t(detailKey);
+    if (detail === detailKey) detail = 'Rejected %s files';
+    detail = detail.indexOf('%s') >= 0
+      ? detail.replace('%s', String(rejectedCount))
+      : detail + ' (' + rejectedCount + ')';
+
+    window.alert(title + '\n\n' + detail);
+  }
+
+  /* ==========================================================
+     导入处理
+     ========================================================== */
+  function handleImportPromise(promise, kind) {
+    promise.then(function(id) {
+      return reloadAll();
+    }).catch(function(err) {
+      var msg = (err && err.message) || String(err);
+      window.alert('Import failed: ' + msg);
+    });
+  }
+
+  function importFiles(fileList) {
+    if (!fileList || !fileList.length) return;
+
+    /* 判定是否来自文件夹：
+       webkitRelativePath 形如 "subdir/foo.js" 或 "folder/pack.js"，
+       顶层单文件可能被浏览器写成 "/foo.js" 或空。
+       判据：相对路径去掉末尾斜杠后还含 "/" 才视为文件夹内容 */
+    var hasDirEntry = false;
+    var jsFiles     = [];
+    var rejected    = 0;
+
+    for (var i = 0; i < fileList.length; i++) {
+      var f   = fileList[i];
+      var rel = f.webkitRelativePath || '';
+      if (rel && rel.replace(/\/+$/, '').indexOf('/') >= 0) {
+        hasDirEntry = true;
+      }
+      if (/\.js$/i.test(f.name)) {
+        jsFiles.push(f);
+      }
+    }
+
+    /* 文件夹模式：走 importFolder；文件夹内其他文件不算"被拒" */
+    if (hasDirEntry) {
+      handleImportPromise(window.mcResourcePacks.importFolder(fileList), 'folder');
+      return;
+    }
+
+    /* 顶层文件模式：统计被拒数量 */
+    for (var j = 0; j < fileList.length; j++) {
+      if (!/\.js$/i.test(fileList[j].name)) rejected++;
+    }
+
+    if (jsFiles.length === 0) {
+      showDropFailure(rejected || fileList.length);
+      return;
+    }
+
+    var chain = Promise.resolve();
+    jsFiles.forEach(function(f) {
+      chain = chain.then(function() {
+        return window.mcResourcePacks.importFile(f);
+      });
+    });
+    chain.then(function() {
+      reloadAll();
+      if (rejected > 0) showDropFailure(rejected);
+    }).catch(function(err) {
+      var msg = (err && err.message) || String(err);
+      window.alert('Import failed: ' + msg);
+    });
+  }
+
+  /* ==========================================================
+     文件选择按钮（只有"打开文件"）
+     ========================================================== */
+  loadFileBtn.addEventListener('click', function() {
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', function() {
+    if (fileInput.files && fileInput.files.length > 0) {
+      importFiles(fileInput.files);
+    }
+    fileInput.value = '';
+  });
+
+  /* ==========================================================
+     拖放（全屏）
+     ========================================================== */
+  var dragDepth = 0;
+
+  function hasFiles(e) {
+    if (!e.dataTransfer) return false;
+    if (e.dataTransfer.types) {
+      for (var i = 0; i < e.dataTransfer.types.length; i++) {
+        if (e.dataTransfer.types[i] === 'Files') return true;
+      }
+    }
+    return false;
+  }
+
+  window.addEventListener('dragenter', function(e) {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    dragDepth++;
+    if (dragDepth === 1) dropOverlay.classList.add('visible');
+  });
+
+  window.addEventListener('dragover', function(e) {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  window.addEventListener('dragleave', function(e) {
+    if (!hasFiles(e)) return;
+    dragDepth--;
+    if (dragDepth <= 0) {
+      dragDepth = 0;
+      dropOverlay.classList.remove('visible');
+    }
+  });
+
+  window.addEventListener('drop', function(e) {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth = 0;
+    dropOverlay.classList.remove('visible');
+
+    /* 优先用 webkitGetAsEntry 处理文件夹 */
+    var items = e.dataTransfer.items;
+    if (items && items.length > 0) {
+      var promises = [];
+      for (var i = 0; i < items.length; i++) {
+        var entry = items[i].webkitGetAsEntry
+          ? items[i].webkitGetAsEntry()
+          : null;
+        if (!entry) continue;
+        promises.push(collectFilesFromEntry(entry));
+      }
+      if (promises.length > 0) {
+        Promise.all(promises).then(function(lists) {
+          var allFiles = [];
+          lists.forEach(function(list) {
+            list.forEach(function(f) { allFiles.push(f); });
+          });
+          if (allFiles.length > 0) importFiles(allFiles);
+        });
+        return;
+      }
+    }
+
+    /* 兜底：直接 files */
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      importFiles(e.dataTransfer.files);
+    }
+  });
+
+  function collectFilesFromEntry(entry) {
+    return new Promise(function(resolve) {
+      if (entry.isFile) {
+        entry.file(function(f) {
+          try {
+            Object.defineProperty(f, 'webkitRelativePath', {
+              value: entry.fullPath || f.name,
+              configurable: true
+            });
+          } catch (e) {}
+          resolve([f]);
+        }, function() { resolve([]); });
+      } else if (entry.isDirectory) {
+        readDirEntries(entry).then(function(entries) {
+          Promise.all(entries.map(collectFilesFromEntry)).then(function(lists) {
+            var out = [];
+            lists.forEach(function(list) {
+              list.forEach(function(f) { out.push(f); });
+            });
+            resolve(out);
+          });
+        }).catch(function() { resolve([]); });
+      } else {
+        resolve([]);
+      }
+    });
+  }
+
+  function readDirEntries(dirEntry) {
+    return new Promise(function(resolve) {
+      var reader = dirEntry.createReader();
+      var all = [];
+      (function readMore() {
+        reader.readEntries(function(entries) {
+          if (!entries.length) { resolve(all); return; }
+          all = all.concat(Array.prototype.slice.call(entries));
+          readMore();
+        }, function() { resolve(all); });
+      })();
+    });
+  }
+
+  /* ==========================================================
      启动
      ========================================================== */
   function boot() {
     var RP = window.mcResourcePacks;
     if (!RP) return;
+
+    RP.onIndexChanged = function() {
+      allIds = RP.getIndex().map(function(e) { return e.id; });
+      render();
+    };
 
     RP.ready.then(function() {
       allIds = RP.getIndex().map(function(e) { return e.id; });
@@ -793,11 +1108,11 @@
         return allIds.indexOf(id) >= 0;
       });
       refreshSet();
-      render();   /* 先用 fallback 渲染 */
+      render();
 
-      /* 加载所有 js（不 apply），保证 available 里也能读到 title/description/icon */
       return RP.loadAll().then(function() {
-        render();   /* 再渲染，数据到位 */
+        render();
+        updateDeleteBtn();
       });
     }).then(function() {
       try { searchEl.focus(); } catch (e) {}
@@ -815,10 +1130,6 @@
       try { window.mcResourcePacks.setSelected(selectedIds.slice()); } catch (e) {}
     });
   }
-
-  folderBtn.addEventListener('click', function() {
-    alert('Web edition: folder opening is not available.');
-  });
 })();
 </script>
 
