@@ -289,12 +289,18 @@
   /* ==========================================================
      参数
      ========================================================== */
-  var params   = new URLSearchParams(location.search);
-  var serverId = params.get('id') || '';
+var params   = new URLSearchParams(location.search);
+var serverId = params.get('id') || '';
 
-  /* ==========================================================
-     读取 realms.html 的 DATA
-     ========================================================== */
+/* ★ URL 没带 id → 从 localStorage 恢复 */
+if (!serverId) {
+  try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+  catch (e) {}
+}
+if (serverId) {
+  try { localStorage.setItem('mc_realms_server_id', serverId); }
+  catch (e) {}
+}
   var STORAGE_KEY = 'mc_realms';
   var FN_KEY = '__fn__';
 

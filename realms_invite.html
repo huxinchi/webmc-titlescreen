@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Invite Player</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .rli-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rli-root > * { pointer-events: auto; }
+
+  /* Profile name: 标签
+     x = width/2 - 100, y = row(1) = 53 */
+  .rli-label {
+    position: absolute;
+    left: calc(50% - 100px);
+    top: 53px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  /* EditBox：200×20, x = width/2 - 100, y = row(2) = 66 */
+  .rli-input {
+    position: absolute;
+    left: calc(50% - 100px);
+    top: 66px;
+    width: 200px;
+    height: 20px;
+    box-sizing: border-box;
+  }
+
+  /* 错误消息：居中，y = row(5) = 105，红色 */
+  .rli-error {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 105px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #FF5555;
+    text-shadow: 1px 1px 0 #3f0000;
+    text-align: center;
+    user-select: none;
+    white-space: nowrap;
+    display: none;
+  }
+  .rli-error.visible { display: block; }
+
+  /* Invite 按钮：200×20, x = width/2 - 100, y = row(10) = 170 */
+  .rli-btn-invite {
+    position: absolute;
+    left: calc(50% - 100px);
+    top: 170px;
+    width: 200px;
+    height: 20px;
+  }
+
+  /* Cancel 按钮：200×20, x = width/2 - 100, y = row(12) = 196 */
+  .rli-btn-cancel {
+    position: absolute;
+    left: calc(50% - 100px);
+    top: 196px;
+    width: 200px;
+    height: 20px;
+  }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rli-root">
+
+  <div class="rli-label" id="rli-label">Profile name:</div>
+
+  <input class="mc-input rli-input" id="rli-input" type="text"
+         autocomplete="off" spellcheck="false" maxlength="16">
+
+  <div class="rli-error" id="rli-error"></div>
+
+  <button class="mcbtn mcbtn-long rli-btn-invite" id="rli-btn-invite">Invite</button>
+  <button class="mcbtn mcbtn-long rli-btn-cancel" id="rli-btn-cancel">Cancel</button>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     硬编码文案（Realms 无 i18n）
+     ========================================================== */
+  var TXT = {
+    label:    'Profile name:',
+    invite:   'Invite',
+    cancel:   'Cancel',
+    error:    'An error occurred while inviting that player. Please try again.'
+  };
+
+  var STORAGE_KEY = 'mc_realms';
+  var FN_KEY = '__fn__';
+
+ var params   = new URLSearchParams(location.search);
+var serverId = params.get('id') || '';
+
+/* ★ URL 没带 id → 从 localStorage 恢复 */
+if (!serverId) {
+  try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+  catch (e) {}
+}
+if (serverId) {
+  try { localStorage.setItem('mc_realms_server_id', serverId); }
+  catch (e) {}
+}
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) {}
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return deserialize(JSON.parse(raw));
+    } catch (e) { return null; }
+  }
+
+  function saveData(data) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data)));
+    } catch (e) {}
+  }
+
+  /* ==========================================================
+     数据
+     ========================================================== */
+  var DATA = loadData();
+  if (!DATA || !DATA.servers) {
+    location.href = 'realms.html';
+    return;
+  }
+
+  var server = null;
+  for (var i = 0; i < DATA.servers.length; i++) {
+    if (DATA.servers[i].id === serverId) { server = DATA.servers[i]; break; }
+  }
+
+  if (!server) {
+    location.href = 'realms.html';
+    return;
+  }
+
+  if (!Array.isArray(server.players)) server.players = [];
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var labelEl  = document.getElementById('rli-label');
+  var inputEl  = document.getElementById('rli-input');
+  var errorEl  = document.getElementById('rli-error');
+  var btnInv   = document.getElementById('rli-btn-invite');
+  var btnCan   = document.getElementById('rli-btn-cancel');
+
+  labelEl.textContent = TXT.label;
+  btnInv.textContent  = TXT.invite;
+  btnCan.textContent  = TXT.cancel;
+
+  /* ==========================================================
+     错误
+     ========================================================== */
+  function showError(msg) {
+    errorEl.textContent = msg || TXT.error;
+    errorEl.classList.add('visible');
+  }
+  function clearError() {
+    errorEl.classList.remove('visible');
+  }
+
+  /* ==========================================================
+     Invite
+     ========================================================== */
+  /* 生成假的 uuid（网页版没有真实服务端） */
+  function fakeUuid(name) {
+    var h = 0;
+    var lower = name.toLowerCase();
+    for (var i = 0; i < lower.length; i++) {
+      h = (h * 31 + lower.charCodeAt(i)) | 0;
+    }
+    var hex = ('00000000' + (h >>> 0).toString(16)).slice(-8);
+    return hex + '-0000-0000-0000-' + ('000000000000' + (h >>> 0).toString(16)).slice(-12);
+  }
+
+function doInvite() {
+  clearError();
+
+  var value = (inputEl.value || '').trim();
+  if (!value) return;   /* 原版：空直接 return，不显示错误 */
+
+  var backUrl = 'realms_players.html?id=' + encodeURIComponent(serverId);
+
+  /* ① 有 onInvite handle → 交给它
+        handle 收到名字，返回：
+          - 一个对象 → 视为新的 server 数据（用它的 players 覆盖）
+          - true    → 视为成功（handle 已自己改了 server.players）
+          - false / null / undefined → 视为失败，显示错误
+  */
+  if (typeof server.onInvite === 'function') {
+    var result;
+    try {
+      result = server.onInvite.call(server, value);
+    } catch (e) {
+      console.error('[realms] onInvite', e);
+      showError(TXT.error);
+      return;
+    }
+
+    if (result === false || result == null) {
+      showError(TXT.error);
+      return;
+    }
+
+    /* 返回对象 → 用它覆盖 server.players */
+    if (typeof result === 'object' && Array.isArray(result.players)) {
+      server.players = result.players;
+    }
+
+    saveData(DATA);
+
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(backUrl);
+    } else {
+      location.href = backUrl;
+    }
+    return;
+  }
+
+  /* ② 无 handle → 默认行为 */
+
+  /* 已存在同名玩家 → 报错 */
+  for (var i = 0; i < server.players.length; i++) {
+    var p = server.players[i];
+    var nm = (p && (p.name || (p.getName && p.getName()))) || '';
+    if (nm.toLowerCase() === value.toLowerCase()) {
+      showError(TXT.error);
+      return;
+    }
+  }
+
+  /* 模拟邀请成功 */
+  server.players.push({
+    name:     value,
+    uuid:     fakeUuid(value),
+    operator: false,
+    accepted: false,
+    online:   false
+  });
+
+  saveData(DATA);
+
+  if (window.mcBack && typeof window.mcBack.back === 'function') {
+    window.mcBack.back(backUrl);
+  } else {
+    location.href = backUrl;
+  }
+}
+
+  function doCancel() {
+    var url = 'realms_players.html?id=' + encodeURIComponent(serverId);
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  /* ==========================================================
+     事件
+     ========================================================== */
+  btnInv.addEventListener('click', doInvite);
+  btnCan.addEventListener('click', doCancel);
+
+  /* 输入框 Enter = Invite */
+  inputEl.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      doInvite();
+    } else {
+      clearError();
+    }
+  });
+
+  /* Esc = Cancel */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      doCancel();
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  try { inputEl.focus(); } catch (e) {}
+
+})();
+</script>
+
+</body>
+</html>

@@ -297,12 +297,22 @@
   var STORAGE_KEY = 'mc_realms';
   var FN_KEY = '__fn__';
 
-  var params   = new URLSearchParams(location.search);
-  var serverId = params.get('id') || '';
+var params   = new URLSearchParams(location.search);
+var serverId = params.get('id') || '';
 
-  /* ==========================================================
-     序列化 / 反序列化（与 realms.html 一致）
-     ========================================================== */
+/* ★ URL 没带 id → 从 localStorage 恢复（供 back 使用） */
+if (!serverId) {
+  try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+  catch (e) {}
+}
+if (serverId) {
+  try { localStorage.setItem('mc_realms_server_id', serverId); }
+  catch (e) {}
+}
+
+/* ==========================================================
+   序列化 / 反序列化（与 realms.html 一致）
+   ========================================================== */
   function serialize(obj) {
     if (Array.isArray(obj)) return obj.map(serialize);
     if (!obj || typeof obj !== 'object') return obj;
@@ -522,11 +532,13 @@
      按钮
      ========================================================== */
   btnInvite.addEventListener('click', function() {
-    window.mcDialog.alert({
-      title:   'Invite Player',
-      message: 'Inviting players is not available yet.'
-    });
-  });
+  var url = 'realms_invite.html?id=' + encodeURIComponent(serverId);
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+});
 
   btnBack.addEventListener('click', function() {
     var url = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);

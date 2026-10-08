@@ -1020,7 +1020,10 @@ function fireJoin(server) {
     catch (e) { console.error('[realms] onConfigure', e); }
   }
 
-  /* 无 handle → 跳配置页 */
+  /* 无 handle → 跳配置页
+     顺便把 serverId 写进 localStorage，让子页面在 back 时也能拿到 */
+  try { localStorage.setItem('mc_realms_server_id', server.id || ''); } catch (e) {}
+
   var url = 'realms_configure_world.html?id=' + encodeURIComponent(server.id || '');
   if (window.mcBack && typeof window.mcBack.jump === 'function') {
     window.mcBack.jump(url);
