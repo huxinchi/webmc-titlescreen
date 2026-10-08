@@ -217,18 +217,7 @@
     top: 79px;
   }
 
-  /* Activity feed 提示：x=50%+12, y=105 */
-  .rpp-activity-info {
-    position: absolute;
-    left: calc(50% + 12px);
-    top: 105px;
-    font-size: var(--font-size, 10px);
-    line-height: 9px;
-    color: #A0A0A0;
-    text-shadow: 1px 1px 0 #1a1a1a;
-    user-select: none;
-    white-space: nowrap;
-  }
+
 
   /* Back 按钮：x=50%+89, y=196 */
   .rpp-btn-back {
@@ -277,9 +266,9 @@
   <div class="rpp-list mc-scroll" id="rpp-list"></div>
 
   <button class="mcbtn mcbtn-160 rpp-btn-invite"   id="rpp-btn-invite">Invite Player</button>
-  <button class="mcbtn mcbtn-160 rpp-btn-activity" id="rpp-btn-activity" disabled>Player Activity</button>
+  <button class="mcbtn mcbtn-160 rpp-btn-activity" id="rpp-btn-activity">Player Activity</button>
 
-  <div class="rpp-activity-info" id="rpp-activity-info">Activity feed is not available in this version</div>
+
 
   <button class="mcbtn mcbtn-83 rpp-btn-back" id="rpp-btn-back">Back</button>
 
@@ -531,20 +520,31 @@ if (serverId) {
   /* ==========================================================
      按钮
      ========================================================== */
-  btnInvite.addEventListener('click', function() {
+btnInvite.addEventListener('click', function() {
   var url = 'realms_invite.html?id=' + encodeURIComponent(serverId);
-  if (window.mcBack && typeof window.mcBack.jump === 'function') {
-    window.mcBack.jump(url);
+  if (window.mcBack && typeof window.mcBack.jumpNoPush === 'function') {
+    window.mcBack.jumpNoPush(url);
   } else {
     location.href = url;
   }
 });
 
-  btnBack.addEventListener('click', function() {
-    var url = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);
-    location.href = url;   /* 用 location.href 避免压栈，让栈顶仍是 configure */
-  });
-
+btnBack.addEventListener('click', function() {
+  var fallback = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);
+  if (window.mcBack && typeof window.mcBack.back === 'function') {
+    window.mcBack.back(fallback);
+  } else {
+    location.href = fallback;
+  }
+});
+btnActivity.addEventListener('click', function() {
+  var url = 'realms_activity.html?id=' + encodeURIComponent(serverId);
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);        // push realms_players.html → 跳 activity
+  } else {
+    location.href = url;            // 兜底
+  }
+});
   /* ==========================================================
      Esc
      ========================================================== */

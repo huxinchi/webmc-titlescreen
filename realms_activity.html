@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Activity</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  /* ==========================================================
+     根容器 —— 逻辑像素
+     ========================================================== */
+  .activity-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .activity-root > * { pointer-events: auto; }
+
+  /* ==========================================================
+     标题
+     ========================================================== */
+  .activity-title {
+    position: absolute;
+    top: 10px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  /* ==========================================================
+     时间轴固定层 —— 垂直分隔线 + 日期标签
+     ========================================================== */
+  .activity-timeline {
+    position: absolute;
+    top: 30px;
+    bottom: 40px;
+    left: 0; right: 0;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .activity-line {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 1px;
+    background: #808080;
+  }
+
+  .activity-day {
+    position: absolute;
+    top: calc(100% - 12px);
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  /* ==========================================================
+     行列表 —— 挂在 .mc-list 容器上（ObjectSelectionList）
+     ========================================================== */
+  .activity-list-wrap {
+    position: absolute;
+    top: 30px;
+    bottom: 40px;
+    left: 0; right: 0;
+    z-index: 1;
+  }
+
+  .activity-row {
+    position: relative;
+    height: 10px;          /* fontLineHeight() + 1 */
+    width: 100%;
+  }
+
+  /* 头像 8×8 @ (10, y) */
+  .activity-face {
+    position: absolute;
+    left: 10px;
+    top: 0;
+    width: 8px;
+    height: 8px;
+    background-color: #202020;
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+  }
+
+  /* 名字 @ (20, y) */
+  .activity-name {
+    position: absolute;
+    left: 20px;
+    top: 0;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #FFFFFF;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    user-select: none;
+    pointer-events: none;
+  }
+  .activity-name.self { color: #7FFFFF; }
+
+  /* 颜色小方块 @ (activityPoint - 8, y + 1.5) 5×5 */
+  .activity-color-box {
+    position: absolute;
+    top: 1.5px;
+    width: 5px;
+    height: 5px;
+  }
+
+  /* 活动条 @ (pos, y + 1.5) 高 5 */
+  .activity-bar {
+    position: absolute;
+    top: 1.5px;
+    height: 5px;
+    cursor: default;
+  }
+
+  /* ==========================================================
+     空状态
+     ========================================================== */
+  .activity-empty {
+    position: absolute;
+    left: 0; right: 0;
+    top: calc(50% - 20px);
+    text-align: center;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    pointer-events: none;
+    display: none;
+  }
+  .activity-empty.visible { display: block; }
+
+  /* ==========================================================
+     Back 按钮 —— (width/2 - 100, height - 30)
+     尺寸走 .mcbtn-long，不做放大
+     ========================================================== */
+  .activity-back {
+    position: absolute;
+    left: calc(50% - 100px);
+    bottom: 10px;
+  }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="activity-root" id="activity-root">
+
+  <div class="activity-title" id="activity-title">Activity</div>
+
+  <div class="activity-timeline" id="activity-timeline"></div>
+
+  <div class="activity-list-wrap mc-list mc-scroll" id="activity-list-wrap"></div>
+
+  <div class="activity-empty" id="activity-empty"></div>
+
+  <a class="mcbtn mcbtn-long activity-back btn-back"
+     href="realms_players.html">Back</a>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     参数
+     ========================================================== */
+  var params = new URLSearchParams(location.search);
+  var serverId = params.get('id') || '';
+
+  if (!serverId) {
+    try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+    catch (e) {}
+  }
+  if (serverId) {
+    try { localStorage.setItem('mc_realms_server_id', serverId); }
+    catch (e) {}
+  }
+
+  /* ==========================================================
+     硬编码文案
+     ========================================================== */
+  var TXT = {
+    title:      'Activity',
+    noActivity: 'No activity in the last %s days!',
+    minute:     'minute',
+    minutes:    'minutes'
+  };
+
+  /* ==========================================================
+     常量
+     ========================================================== */
+  var STORAGE_KEY  = 'mc_realms';
+  var ACTIVITY_KEY = 'mc_realms_activity';
+  var FN_KEY       = '__fn__';
+
+  var COLORS = [
+    { r: 79,  g: 243, b: 29  },
+    { r: 243, g: 175, b: 29  },
+    { r: 243, g: 29,  b: 190 },
+    { r: 29,  g: 165, b: 243 },
+    { r: 29,  g: 243, b: 130 },
+    { r: 243, g: 29,  b: 64  },
+    { r: 29,  g: 74,  b: 243 }
+  ];
+
+  /* ==========================================================
+     序列化 / 反序列化
+     ========================================================== */
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) {}
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return deserialize(JSON.parse(raw));
+    } catch (e) { return null; }
+  }
+
+  var DATA = loadData();
+  var server = null;
+
+  if (DATA && Array.isArray(DATA.servers)) {
+    for (var i = 0; i < DATA.servers.length; i++) {
+      if (DATA.servers[i].id === serverId) { server = DATA.servers[i]; break; }
+    }
+  }
+
+  if (!DATA) {
+    DATA = { ownUUID: 'self-uuid', servers: [] };
+  }
+  if (!server) {
+    server = { id: serverId || 'realm_activity', name: 'Activity' };
+  }
+
+  /* ==========================================================
+     读取活动数据
+     ========================================================== */
+  function loadActivityList() {
+    if (serverId) {
+      try {
+        var raw = localStorage.getItem(ACTIVITY_KEY);
+        if (raw) {
+          var obj = JSON.parse(raw);
+          if (obj && obj[serverId]) return obj[serverId];
+        }
+      } catch (e) {}
+    }
+
+    if (server && server.activityList) return server.activityList;
+
+    return generateMockActivity();
+  }
+
+  function generateMockActivity() {
+    var now    = Date.now();
+    var period = 30 * 24 * 60 * 60 * 1000;
+    var base   = now - period;
+
+    var players = [
+      { uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', name: 'Notch'      },
+      { uuid: '853c80ef-3c37-49fd-aa49-938b674adae6', name: 'jeb_'       },
+      { uuid: '61699b2e-d327-4a01-9f1e-0ea8c3f06bc6', name: 'Dinnerbone' },
+      { uuid: 'e5d3622f-e0f4-4e50-8cbc-6c1a2b9d3f5e', name: 'Grumm'      },
+      { uuid: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', name: 'Steve'      }
+    ];
+
+    var activities = [];
+
+    for (var i = 0; i < players.length; i++) {
+      var count = 4 + Math.floor(Math.random() * 10);
+      for (var j = 0; j < count; j++) {
+        var joinTime  = base + Math.random() * period;
+        var duration  = 5 * 60 * 1000 + Math.random() * 180 * 60 * 1000;
+        var leaveTime = Math.min(now, joinTime + duration);
+
+        activities.push({
+          profileUuid: players[i].uuid,
+          profileName: players[i].name,
+          joinTime:    Math.floor(joinTime),
+          leaveTime:   Math.floor(leaveTime)
+        });
+      }
+    }
+
+    return {
+      periodInMillis:  period,
+      serverActivities: activities
+    };
+  }
+
+  /* ==========================================================
+     字体宽度测量 —— 与 CSS 的 --font-size 默认值一致
+     ========================================================== */
+  var _measureCanvas = document.createElement('canvas');
+  var _measureCtx    = _measureCanvas.getContext('2d');
+
+  function fontWidth(str) {
+    if (!str) return 0;
+    _measureCtx.font = '10px "Minecraft", monospace';
+    return Math.round(_measureCtx.measureText(str).width);
+  }
+
+  /* ==========================================================
+     时间工具
+     ========================================================== */
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  function formatDay(ts) {
+    var d = new Date(ts);
+    return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1);
+  }
+
+  function formatTime(ts) {
+    var d = new Date(ts);
+    return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+
+  function hourIndex(ts)   { return new Date(ts).getHours();   }
+  function minuteIndex(ts) { return new Date(ts).getMinutes(); }
+
+  /* ==========================================================
+     数据 → 活动矩阵
+     ========================================================== */
+  function convertToActivityMatrix(list) {
+    var rows = [];
+    var periodInMillis = list.periodInMillis;
+    var base = Date.now() - periodInMillis;
+
+    var acts = list.serverActivities || [];
+
+    for (var i = 0; i < acts.length; i++) {
+      var sa = acts[i];
+      var row = findRow(sa.profileUuid, rows);
+
+      var activity = {
+        base:  base,
+        start: sa.joinTime,
+        end:   sa.leaveTime,
+        dayIndex: 0
+      };
+
+      if (!row) {
+        var name = sa.profileName || sa.profileUuid || 'Unknown';
+        row = {
+          key:        sa.profileUuid,
+          uuid:       sa.profileUuid,
+          name:       name,
+          activities: [],
+          color:      null
+        };
+        row.activities.push(activity);
+        rows.push(row);
+      } else {
+        row.activities.push(activity);
+      }
+    }
+
+    rows.sort(function(a, b) {
+      return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
+    });
+
+    var colorIndex = 0;
+    for (var r = 0; r < rows.length; r++) {
+      rows[r].color = COLORS[colorIndex % COLORS.length];
+      colorIndex++;
+      rows[r].activities.sort(function(a, b) { return a.start - b.start; });
+    }
+
+    return rows;
+  }
+
+  function findRow(key, rows) {
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].key === key) return rows[i];
+    }
+    return null;
+  }
+
+  function buildDayList(rows) {
+    var dayList = [];
+
+    for (var i = 0; i < rows.length; i++) {
+      for (var j = 0; j < rows[i].activities.length; j++) {
+        var act = rows[i].activities[j];
+        var day = formatDay(act.start);
+        var exists = false;
+        for (var k = 0; k < dayList.length; k++) {
+          if (dayList[k].day === day) { exists = true; break; }
+        }
+        if (!exists) {
+          dayList.push({ day: day, timestamp: act.start });
+        }
+      }
+    }
+
+    dayList.sort(function(a, b) { return a.timestamp - b.timestamp; });
+
+    for (var i2 = 0; i2 < rows.length; i2++) {
+      for (var j2 = 0; j2 < rows[i2].activities.length; j2++) {
+        var act2 = rows[i2].activities[j2];
+        var d = formatDay(act2.start);
+        var idx = -1;
+        for (var k2 = 0; k2 < dayList.length; k2++) {
+          if (dayList[k2].day === d) { idx = k2; break; }
+        }
+        act2.dayIndex = idx + 1;
+      }
+    }
+
+    return dayList;
+  }
+
+  /* ==========================================================
+     全局状态
+     ========================================================== */
+  var activityList   = loadActivityList();
+  var activityMap    = convertToActivityMatrix(activityList);
+  var dayList        = buildDayList(activityMap);
+  var periodInMillis = activityList.periodInMillis || 0;
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var rootEl     = document.getElementById('activity-root');
+  var titleEl    = document.getElementById('activity-title');
+  var timelineEl = document.getElementById('activity-timeline');
+  var listWrapEl = document.getElementById('activity-list-wrap');
+  var emptyEl    = document.getElementById('activity-empty');
+
+  titleEl.textContent = TXT.title;
+
+  /* ==========================================================
+     接入通用 ObjectSelectionList
+     ========================================================== */
+  if (window.mcWidgets && typeof window.mcWidgets.ObjectSelectionList === 'function') {
+    new window.mcWidgets.ObjectSelectionList(listWrapEl, {
+      entrySelector: '.activity-row'
+    });
+  }
+
+  /* ==========================================================
+     布局计算
+     ========================================================== */
+  function computeLayout() {
+    var W = rootEl.clientWidth;
+
+    var maxKeyWidth = 0;
+    for (var i = 0; i < activityMap.length; i++) {
+      var keyWidth = fontWidth(activityMap[i].name) + 2;
+      if (keyWidth > maxKeyWidth) maxKeyWidth = keyWidth + 10;
+    }
+
+    var activityPoint = maxKeyWidth + 25;
+    var spaceLeft     = W - activityPoint - 10;
+    var days          = dayList.length < 1 ? 1 : dayList.length;
+    var dayWidth      = spaceLeft / days;
+    var hourWidth     = dayWidth / 24;
+    var minuteWidth   = hourWidth / 60;
+
+    return {
+      W:             W,
+      activityPoint: activityPoint,
+      dayWidth:      dayWidth,
+      hourWidth:     hourWidth,
+      minuteWidth:   minuteWidth,
+      days:          days
+    };
+  }
+
+  /* ==========================================================
+     渲染时间轴
+     ========================================================== */
+  function renderTimeline(L) {
+    timelineEl.innerHTML = '';
+
+    var mainLine = document.createElement('div');
+    mainLine.className = 'activity-line';
+    mainLine.style.left = L.activityPoint + 'px';
+    timelineEl.appendChild(mainLine);
+
+    for (var i = 0; i < dayList.length; i++) {
+      var daysIndex = i + 1;
+
+      var line = document.createElement('div');
+      line.className = 'activity-line';
+      line.style.left = (L.activityPoint + daysIndex * L.dayWidth) + 'px';
+      timelineEl.appendChild(line);
+
+      var label = document.createElement('div');
+      label.className = 'activity-day';
+      label.textContent = dayList[i].day;
+
+      var labelW = fontWidth(dayList[i].day);
+      var x = L.activityPoint
+            + (daysIndex - 1) * L.dayWidth
+            + (L.dayWidth - labelW) / 2
+            + 2;
+      label.style.left = x + 'px';
+
+      timelineEl.appendChild(label);
+    }
+  }
+
+  /* ==========================================================
+     渲染单行
+     ========================================================== */
+  function renderRow(row, L) {
+    var el = document.createElement('div');
+    el.className = 'activity-row';
+
+    var face = document.createElement('div');
+    face.className = 'activity-face';
+    if (row.uuid) {
+      face.style.backgroundImage = 'url("https://crafatar.com/avatars/' +
+        encodeURIComponent(row.uuid) + '?size=8&overlay")';
+    }
+    el.appendChild(face);
+
+    var nameEl = document.createElement('div');
+    nameEl.className = 'activity-name';
+    if (row.uuid && row.uuid === DATA.ownUUID) nameEl.classList.add('self');
+    nameEl.textContent = row.name;
+    el.appendChild(nameEl);
+
+    var colorBox = document.createElement('div');
+    colorBox.className = 'activity-color-box';
+    colorBox.style.left = (L.activityPoint - 8) + 'px';
+    colorBox.style.backgroundColor =
+      'rgb(' + row.color.r + ',' + row.color.g + ',' + row.color.b + ')';
+    el.appendChild(colorBox);
+
+    /* 活动条合并 —— 对齐 Java 的 toRender 逻辑 */
+    var toRender = [];
+
+    for (var j = 0; j < row.activities.length; j++) {
+      var act  = row.activities[j];
+      var hour = hourIndex(act.start);
+      var min  = minuteIndex(act.start);
+
+      var itemWidth = L.minuteWidth * ((act.end - act.start) / 60000);
+      if (itemWidth < 3) itemWidth = 3;
+
+      var pos = L.activityPoint
+              + (L.dayWidth * act.dayIndex - L.dayWidth)
+              + hour * L.hourWidth
+              + min  * L.minuteWidth;
+
+      var length = Math.ceil((act.end - act.start) / 1000 / 60);
+      if (length < 1) length = 1;
+
+      var tooltip = '[' + formatTime(act.start) + ' - ' + formatTime(act.end) + '] ' +
+                    length + ' ' + (length > 1 ? TXT.minutes : TXT.minute);
+
+      var exists = false;
+      for (var k = 0; k < toRender.length; k++) {
+        var r = toRender[k];
+        if (r.start + r.width >= pos - 0.5) {
+          var overlap = r.start + r.width - pos;
+          var padding = Math.max(0, pos - (r.start + r.width));
+          r.width   = r.width - Math.max(0, overlap) + itemWidth + padding;
+          r.tooltip = r.tooltip + '\n' + tooltip;
+          exists = true;
+          break;
+        }
+      }
+
+      if (!exists) {
+        toRender.push({ start: pos, width: itemWidth, tooltip: tooltip });
+      }
+    }
+
+    var colorStr = 'rgb(' + row.color.r + ',' + row.color.g + ',' + row.color.b + ')';
+
+    for (var m = 0; m < toRender.length; m++) {
+      var item = toRender[m];
+
+      var bar = document.createElement('div');
+      bar.className = 'activity-bar';
+      bar.style.left = item.start + 'px';
+      bar.style.width = item.width + 'px';
+      bar.style.backgroundColor = colorStr;
+      /* 交给通用 tooltip.js 的全局委托处理 */
+      bar.dataset.tooltip = item.tooltip;
+
+      el.appendChild(bar);
+    }
+
+    return el;
+  }
+
+  /* ==========================================================
+     渲染全部行
+     ========================================================== */
+  function renderRows(L) {
+    listWrapEl.innerHTML = '';
+    for (var i = 0; i < activityMap.length; i++) {
+      listWrapEl.appendChild(renderRow(activityMap[i], L));
+    }
+  }
+
+  /* ==========================================================
+     空状态文案
+     ========================================================== */
+  function updateEmptyState() {
+    if (activityMap.length > 0) {
+      emptyEl.classList.remove('visible');
+      return;
+    }
+
+    var days = Math.floor(periodInMillis / (24 * 60 * 60 * 1000));
+    if (!(days >= 0)) days = 0;
+
+    emptyEl.textContent = TXT.noActivity.replace('%s', days);
+    emptyEl.classList.add('visible');
+  }
+
+  /* ==========================================================
+     主渲染
+     ========================================================== */
+  function render() {
+    var L = computeLayout();
+
+    if (activityMap.length > 0) {
+      renderTimeline(L);
+      renderRows(L);
+    } else {
+      timelineEl.innerHTML = '';
+      listWrapEl.innerHTML = '';
+    }
+
+    updateEmptyState();
+  }
+
+  /* ==========================================================
+     Esc → mcBack.back，fallback 直接 location.href
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    var url = 'realms_players.html?id=' + encodeURIComponent(serverId);
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;
+    }
+  }, true);
+
+  /* ==========================================================
+     窗口尺寸变化 → 重排
+     ========================================================== */
+  var resizeTimer = null;
+  window.addEventListener('resize', function() {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(render, 80);
+  });
+
+  /* ==========================================================
+     对外 API
+     ========================================================== */
+  window.mcActivity = {
+    getData:  function() { return activityMap; },
+    getDays:  function() { return dayList; },
+    refresh:  function() {
+      activityList   = loadActivityList();
+      activityMap    = convertToActivityMatrix(activityList);
+      dayList        = buildDayList(activityMap);
+      periodInMillis = activityList.periodInMillis || 0;
+      render();
+    }
+  };
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  render();
+
+})();
+</script>
+
+</body>
+</html>
