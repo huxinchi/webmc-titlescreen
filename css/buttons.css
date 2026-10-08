@@ -413,3 +413,46 @@
 .mcbtn-153:disabled {
   background-image: url('../assets/button/button_disabled_153.png');
 }
+/* ==========================================================
+   Realms Reset World 专用尺寸
+   ========================================================== */
+
+/* 80×20 —— Cancel */
+.mcbtn-80 {
+  width: 80px;
+  height: 20px;
+  background-image: url('../assets/button/button_80.png');
+}
+.mcbtn-80:hover:not(:disabled),
+.mcbtn-80:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_80.png');
+}
+.mcbtn-80:disabled {
+  background-image: url('../assets/button/button_disabled_80.png');
+}
+
+/* 97×20 —— Back / Reset */
+.mcbtn-97 {
+  width: 97px;
+  height: 20px;
+  background-image: url('../assets/button/button_97.png');
+}
+.mcbtn-97:hover:not(:disabled),
+.mcbtn-97:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_97.png');
+}
+.mcbtn-97:disabled {
+  background-image: url('../assets/button/button_disabled_97.png');
+}
+.mcbtn-205 {
+  width: 205px;
+  height: 20px;
+  background-image: url('../assets/button/button_205.png');
+}
+.mcbtn-205:hover:not(:disabled),
+.mcbtn-205:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_205.png');
+}
+.mcbtn-205:disabled {
+  background-image: url('../assets/button/button_disabled_205.png');
+}

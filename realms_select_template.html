@@ -341,7 +341,9 @@
   var btnSelect  = document.getElementById('btn-select');
   var btnBack    = document.getElementById('btn-back');
 
-  titleEl.textContent   = isMinigame ? TXT.titleMinigame : TXT.titleDefault;
+  var titleParam = params.get('title');
+titleEl.textContent = titleParam ||
+                      (isMinigame ? TXT.titleMinigame : TXT.titleDefault);
   btnSelect.textContent = TXT.select;
   btnBack.textContent   = isMinigame ? TXT.cancel : TXT.back;
 
@@ -594,7 +596,37 @@
     server.minigameAuthor      = tpl.author || '';
     server.minigameVersion     = tpl.version || '';
     server.minigameRecommended = tpl.recommendedPlayers || '';
+var fromReset = params.get('from') === 'reset';
+var resetSlot = parseInt(params.get('slot'), 10);
 
+if (fromReset && resetSlot >= 1 && resetSlot <= 3) {
+  /* Reset 流程：写回 slots[resetSlot] */
+  if (!server.slots) server.slots = {};
+  server.slots[resetSlot] = server.slots[resetSlot] || {};
+
+  var s = server.slots[resetSlot];
+  s.empty = false;
+  s.name  = s.name || ('World ' + resetSlot);
+  s.image = tpl.image || ('assets/background/panorama_' + (resetSlot % 6) + '.png');
+  s.templateId = tpl.id;
+
+  /* 清 minigame */
+  delete server.minigameTemplateId;
+  delete server.minigameName;
+  delete server.minigameImage;
+  delete server.minigameAuthor;
+  delete server.minigameVersion;
+  delete server.minigameRecommended;
+  if (server.worldType === 'MINIGAME') server.worldType = 'NORMAL';
+
+  saveData(DATA);
+  goBack();
+  return;
+}
+
+/* 原有 minigame 流程 */
+server.minigameTemplateId  = tpl.id;
+/* ...以下保持原样... */
     /* 只有 MINIGAME 类型的模板才切 worldType
        （对齐 callback() 里的 type 判断） */
     if (tpl.type === 'MINIGAME') {

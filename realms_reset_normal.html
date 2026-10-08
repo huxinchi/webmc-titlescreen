@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Generate World</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .rrn-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rrn-root > * { pointer-events: auto; }
+
+  /* Title @ (w/2, 17) */
+  .rrn-title {
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    top: 17px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none; white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* Label "Seed" @ (w/2-100, row(1)=30) */
+  .rrn-label {
+    position: absolute;
+    left: calc(50% - 100px);
+    top: 30px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    user-select: none; white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* Seed EditBox @ (w/2-100, row(2)=50)，200×20 */
+  .rrn-seed-wrap {
+    position: absolute;
+    left: calc(50% - 100px);
+    top: 50px;
+    width: 200px; height: 20px;
+  }
+  .rrn-seed-wrap .mc-input {
+    width: 100%; height: 100%;
+    box-sizing: border-box;
+    font-size: var(--font-size, 10px);
+  }
+
+  /* Level Type @ (w/2-102, row(4)=90)，205×20 */
+  .rrn-btn {
+    position: absolute;
+    left: calc(50% - 102px);
+  }
+  .rrn-btn-level     { top: 90px; }
+  .rrn-btn-structures{ top: 128px; }   /* row(6)-2 */
+
+  /* Back / Reset：row(12)=250 */
+  .rrn-btn-reset {
+    position: absolute;
+    left: calc(50% - 102px);
+    top: 250px;
+  }
+  .rrn-btn-back {
+    position: absolute;
+    left: calc(50% + 8px);
+    top: 250px;
+  }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rrn-root" id="rrn-root">
+
+  <div class="rrn-title">Generate World</div>
+
+  <div class="rrn-label">Seed:</div>
+  <div class="rrn-seed-wrap">
+    <input class="mc-input" id="rrn-seed" type="text" autocomplete="off" maxlength="32">
+  </div>
+
+  <button class="mcbtn mcbtn-205 rrn-btn rrn-btn-level"      id="btn-level"      type="button"></button>
+  <button class="mcbtn mcbtn-205 rrn-btn rrn-btn-structures" id="btn-structures" type="button"></button>
+
+  <button class="mcbtn mcbtn-97 rrn-btn-reset" id="btn-reset" type="button">Reset</button>
+  <button class="mcbtn mcbtn-97 rrn-btn-back"  id="btn-back"  type="button">Back</button>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var params   = new URLSearchParams(location.search);
+  var serverId = params.get('id') || '';
+  var slotParam = params.get('slot') || '';
+
+  if (!serverId) {
+    try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+    catch (e) {}
+  }
+  if (serverId) {
+    try { localStorage.setItem('mc_realms_server_id', serverId); }
+    catch (e) {}
+  }
+
+  var slotId = parseInt(slotParam, 10);
+
+  /* ==========================================================
+     文案
+     ========================================================== */
+  var TXT = {
+    title:        'Generate World',
+    seedLabel:    'Seed:',
+    levelTypes:   ['Default', 'Flat', 'Large Biomes', 'Amplified'],
+    levelTypeName:'World Type',
+    structures:   'Generate Structures',
+    on:           'On',
+    off:          'Off',
+    reset:        'Reset',
+    back:         'Back'
+  };
+
+  /* ==========================================================
+     序列化
+     ========================================================== */
+  var STORAGE_KEY = 'mc_realms';
+  var FN_KEY = '__fn__';
+
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) {}
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return deserialize(JSON.parse(raw));
+    } catch (e) { return null; }
+  }
+
+  function saveData(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data))); } catch (e) {}
+  }
+
+  var DATA = loadData();
+  var server = null;
+  if (DATA && Array.isArray(DATA.servers)) {
+    for (var i = 0; i < DATA.servers.length; i++) {
+      if (DATA.servers[i].id === serverId) { server = DATA.servers[i]; break; }
+    }
+  }
+  if (!server) { location.href = 'realms.html'; return; }
+
+  /* ==========================================================
+     状态
+     ========================================================== */
+  var levelTypeIndex = 0;
+  var generateStructures = true;
+
+  var btnLevel = document.getElementById('btn-level');
+  var btnStruc = document.getElementById('btn-structures');
+  var seedEl   = document.getElementById('rrn-seed');
+
+  function refreshLevel() {
+    btnLevel.textContent = TXT.levelTypeName + ': ' + TXT.levelTypes[levelTypeIndex];
+  }
+  function refreshStruc() {
+    btnStruc.textContent = TXT.structures + ': ' + (generateStructures ? TXT.on : TXT.off);
+  }
+
+  btnLevel.addEventListener('click', function() {
+    levelTypeIndex = (levelTypeIndex + 1) % TXT.levelTypes.length;
+    refreshLevel();
+  });
+  btnStruc.addEventListener('click', function() {
+    generateStructures = !generateStructures;
+    refreshStruc();
+  });
+
+  refreshLevel();
+  refreshStruc();
+
+  /* ==========================================================
+     Reset —— 写回 server.slots[slotId]，回 configure_world
+     ========================================================== */
+  function doReset() {
+    var targetSlot = slotId;
+    if (!(targetSlot >= 1 && targetSlot <= 3)) targetSlot = server.activeSlot || 1;
+
+    if (!server.slots) server.slots = {};
+    server.slots[targetSlot] = server.slots[targetSlot] || {};
+
+    var s = server.slots[targetSlot];
+    s.empty             = false;
+    s.name              = s.name || ('World ' + targetSlot);
+    s.image             = s.image || ('assets/background/panorama_' + (targetSlot % 6) + '.png');
+    s.seed              = (seedEl.value || '').trim();
+    s.levelType         = levelTypeIndex;
+    s.generateStructures = generateStructures;
+
+    /* 清 minigame 相关（对齐 Java 的 reset 语义：变成普通世界） */
+    delete server.minigameTemplateId;
+    delete server.minigameName;
+    delete server.minigameImage;
+    delete server.minigameAuthor;
+    delete server.minigameVersion;
+    delete server.minigameRecommended;
+
+    if (server.worldType === 'MINIGAME') {
+      server.worldType = 'NORMAL';
+    }
+
+    saveData(DATA);
+
+    var url = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  document.getElementById('btn-reset').addEventListener('click', doReset);
+
+  document.getElementById('btn-back').addEventListener('click', function() {
+    var url = 'realms_reset_world.html?id=' + encodeURIComponent(serverId) +
+              '&slot=' + encodeURIComponent(slotId);
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;
+    }
+  });
+
+  /* ==========================================================
+     键盘
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      doReset();
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      document.getElementById('btn-back').click();
+    }
+  }, true);
+
+  try { seedEl.focus(); } catch (e) {}
+
+})();
+</script>
+
+</body>
+</html>

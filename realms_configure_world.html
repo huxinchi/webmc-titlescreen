@@ -724,9 +724,18 @@ btnOptions.addEventListener('click', function() {
   btnBackup.addEventListener('click', function() {
     placeholder('Backups');
   });
-  btnResetWorld.addEventListener('click', function() {
-    placeholder('Reset World');
-  });
+
+
+// 改成
+btnResetWorld.addEventListener('click', function() {
+  var url = 'realms_reset_world.html?id=' + encodeURIComponent(serverId) +
+            '&slot=' + encodeURIComponent(activeSlot);
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+});
 
 
 // 改成
@@ -831,6 +840,16 @@ btnSwitchMin.addEventListener('click', function() {
   /* result=false（Cancel / No）→ 什么都不做 */
   if (res.result !== true) return;
 
+// 改成
+if (res.id === 10 && pendingSlot >= 1 && pendingSlot <= 3) {
+  var url = 'realms_reset_world.html?id=' + encodeURIComponent(serverId) +
+            '&slot=' + pendingSlot;
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+}
   /* id 101/102/103 → 切 slot 1/2/3 */
   if (res.id >= 101 && res.id <= 103) {
     var slotId = res.id - 100;

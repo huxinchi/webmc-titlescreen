@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Select World to Upload</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .rus-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rus-root > * { pointer-events: auto; }
+
+  /* Title @ (w/2, 13) */
+  .rus-title {
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    top: 13px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none; white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* 副标题 @ row(-1) —— Java 就是负的（屏幕外），不显示，只保留元素 */
+  .rus-subtitle {
+    display: none;
+  }
+
+  /* 列表：row(0)=10 → h-40 */
+  .rus-list-wrap {
+    position: absolute;
+    left: 0; right: 0;
+    top: 10px;
+    bottom: 40px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  .rus-item {
+    position: relative;
+    width: 280px; height: 36px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    cursor: pointer;
+    user-select: none;
+  }
+  .rus-item.selected {
+    background-color: #000000;
+    box-shadow: inset 0 0 0 1px #808080;
+  }
+  .rus-item:hover:not(.selected) {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .rus-item-name {
+    position: absolute; left: 2px; top: 1px;
+    font-size: var(--font-size, 10px); line-height: 9px;
+    color: #FFFFFF; text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 270px; pointer-events: none;
+  }
+  .rus-item-id {
+    position: absolute; left: 2px; top: 12px;
+    font-size: var(--font-size, 10px); line-height: 9px;
+    color: #808080; text-shadow: 1px 1px 0 #1a1a1a;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 270px; pointer-events: none;
+  }
+  .rus-item-info {
+    position: absolute; left: 2px; top: 22px;
+    font-size: var(--font-size, 10px); line-height: 9px;
+    color: #808080; text-shadow: 1px 1px 0 #1a1a1a;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 270px; pointer-events: none;
+  }
+  .rus-item-info.hardcore {
+    color: #AA0000;
+  }
+
+  /* 空状态 */
+  .rus-empty {
+    position: absolute;
+    left: 0; right: 0;
+    top: calc(50% - 20px);
+    text-align: center;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    pointer-events: none;
+    display: none;
+  }
+  .rus-empty.visible { display: block; }
+
+  /* 底部按钮 */
+  .rus-btn {
+    position: absolute;
+    bottom: 12px;
+  }
+  .rus-btn-upload { left: calc(50% - 154px); }
+  .rus-btn-back   { left: calc(50% + 6px); }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rus-root" id="rus-root">
+
+  <div class="rus-title">Select World to Upload</div>
+  <div class="rus-subtitle"></div>
+
+  <div class="rus-list-wrap mc-scroll" id="rus-list-wrap">
+    <div class="rus-list" id="rus-list"></div>
+  </div>
+
+  <div class="rus-empty" id="rus-empty">No worlds to upload</div>
+
+  <button class="mcbtn mcbtn-153 rus-btn rus-btn-upload" id="btn-upload" type="button" disabled>Upload</button>
+  <button class="mcbtn mcbtn-153 rus-btn rus-btn-back"   id="btn-back"   type="button">Back</button>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var params   = new URLSearchParams(location.search);
+  var serverId = params.get('id') || '';
+  var slotParam = params.get('slot') || '';
+
+  if (!serverId) {
+    try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+    catch (e) {}
+  }
+  if (serverId) {
+    try { localStorage.setItem('mc_realms_server_id', serverId); }
+    catch (e) {}
+  }
+
+  var slotId = parseInt(slotParam, 10);
+
+  /* ==========================================================
+     文案
+     ========================================================== */
+  var TXT = {
+    title:        'Select World to Upload',
+    empty:        'No worlds to upload',
+    upload:       'Upload',
+    back:         'Back',
+    conversion:   'Requires conversion',
+    hardcore:     'Hardcore',
+    cheats:       'Cheats',
+    worldPrefix:  'World',
+    gameModes:    ['Survival', 'Creative', 'Adventure', 'Spectator']
+  };
+
+  /* ==========================================================
+     本地存档数据
+     优先从 localStorage.mc_saves 读；否则用 mock
+     ========================================================== */
+  function loadSaves() {
+    try {
+      var raw = localStorage.getItem('mc_saves');
+      if (raw) {
+        var arr = JSON.parse(raw);
+        if (Array.isArray(arr)) return arr;
+      }
+    } catch (e) {}
+    return generateMockSaves();
+  }
+
+  function generateMockSaves() {
+    var now = Date.now();
+    return [
+      { id: 'survival_1', name: 'My Survival World', lastPlayed: now - 86400000,        gameMode: 0, hardcore: false, cheats: true  },
+      { id: 'creative_1', name: 'Creative Build',    lastPlayed: now - 3600000 * 4,     gameMode: 1, hardcore: false, cheats: false },
+      { id: 'old_1',      name: 'Old World',         lastPlayed: now - 86400000 * 30,   gameMode: 0, hardcore: true,  cheats: false, requiresConversion: true },
+      { id: 'adv_1',      name: '',                  lastPlayed: now - 86400000 * 3,    gameMode: 2, hardcore: false, cheats: false }
+    ];
+  }
+
+  var saves = loadSaves();
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var listEl   = document.getElementById('rus-list');
+  var emptyEl  = document.getElementById('rus-empty');
+  var btnUp    = document.getElementById('btn-upload');
+  var btnBack  = document.getElementById('btn-back');
+
+  btnUp.textContent   = TXT.upload;
+  btnBack.textContent = TXT.back;
+
+  /* ==========================================================
+     选中状态
+     ========================================================== */
+  var selectedIndex = -1;
+
+  function setSelected(idx) {
+    if (idx < 0 || idx >= saves.length) idx = -1;
+    selectedIndex = idx;
+
+    var items = listEl.querySelectorAll('.rus-item');
+    for (var i = 0; i < items.length; i++) {
+      items[i].classList.toggle('selected', i === idx);
+    }
+
+    /* Upload 按钮：选中 + 非 hardcore 才可点 */
+    var ok = (idx >= 0 && !saves[idx].hardcore);
+    btnUp.disabled = !ok;
+  }
+
+  /* ==========================================================
+     渲染
+     ========================================================== */
+  function formatDate(ms) {
+    try {
+      var d = new Date(ms);
+      var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+      return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate()) +
+             ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    } catch (e) { return ''; }
+  }
+
+  function renderList() {
+    listEl.innerHTML = '';
+
+    if (saves.length === 0) {
+      emptyEl.classList.add('visible');
+      return;
+    }
+    emptyEl.classList.remove('visible');
+
+    for (var i = 0; i < saves.length; i++) {
+      listEl.appendChild(renderItem(saves[i], i));
+    }
+  }
+
+  function renderItem(save, index) {
+    var el = document.createElement('div');
+    el.className = 'rus-item';
+    el.dataset.index = String(index);
+
+    /* 名字（空的话用 "World N" 兜底） */
+    var nameText = save.name && save.name.trim() ? save.name : (TXT.worldPrefix + ' ' + (index + 1));
+    var nameEl = document.createElement('div');
+    nameEl.className = 'rus-item-name';
+    nameEl.textContent = nameText;
+    el.appendChild(nameEl);
+
+    /* id + 日期 */
+    var idEl = document.createElement('div');
+    idEl.className = 'rus-item-id';
+    idEl.textContent = (save.id || '') + ' (' + formatDate(save.lastPlayed) + ')';
+    el.appendChild(idEl);
+
+    /* 信息行 */
+    var infoEl = document.createElement('div');
+    infoEl.className = 'rus-item-info';
+
+    if (save.requiresConversion) {
+      infoEl.textContent = TXT.conversion;
+    } else if (save.hardcore) {
+      infoEl.textContent = TXT.hardcore;
+      infoEl.classList.add('hardcore');
+    } else {
+      var parts = [TXT.gameModes[save.gameMode || 0] || ''];
+      if (save.cheats) parts.push(TXT.cheats);
+      infoEl.textContent = parts.join(', ');
+    }
+    el.appendChild(infoEl);
+
+    el.addEventListener('click', function() { setSelected(index); });
+    el.addEventListener('dblclick', function() {
+      setSelected(index);
+      if (!btnUp.disabled) doUpload();
+    });
+
+    return el;
+  }
+
+  /* ==========================================================
+     Upload —— 写回 server.slots[slotId]
+     （真实流程走文件上传，网页版模拟为立即完成）
+     ========================================================== */
+  var STORAGE_KEY = 'mc_realms';
+  var FN_KEY = '__fn__';
+
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) {}
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return deserialize(JSON.parse(raw));
+    } catch (e) { return null; }
+  }
+
+  function saveData(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data))); } catch (e) {}
+  }
+
+  function doUpload() {
+    if (selectedIndex < 0) return;
+    var save = saves[selectedIndex];
+    if (save.hardcore) return;
+
+    var DATA = loadData();
+    if (!DATA || !Array.isArray(DATA.servers)) { location.href = 'realms.html'; return; }
+
+    var server = null;
+    for (var i = 0; i < DATA.servers.length; i++) {
+      if (DATA.servers[i].id === serverId) { server = DATA.servers[i]; break; }
+    }
+    if (!server) { location.href = 'realms.html'; return; }
+
+    var targetSlot = slotId;
+    if (!(targetSlot >= 1 && targetSlot <= 3)) targetSlot = server.activeSlot || 1;
+
+    if (!server.slots) server.slots = {};
+    server.slots[targetSlot] = server.slots[targetSlot] || {};
+
+    var s = server.slots[targetSlot];
+    s.empty = false;
+    s.name  = (save.name && save.name.trim()) ? save.name : ('World ' + targetSlot);
+    s.image = s.image || 'assets/background/panorama_0.png';
+    s.uploadedSaveId = save.id;
+
+    /* 清 minigame */
+    delete server.minigameTemplateId;
+    delete server.minigameName;
+    delete server.minigameImage;
+    delete server.minigameAuthor;
+    delete server.minigameVersion;
+    delete server.minigameRecommended;
+    if (server.worldType === 'MINIGAME') server.worldType = 'NORMAL';
+
+    saveData(DATA);
+
+    var url = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  btnUp.addEventListener('click', function() {
+    if (btnUp.disabled) return;
+    doUpload();
+  });
+
+  /* ==========================================================
+     Back
+     ========================================================== */
+  function goBack() {
+    var url = 'realms_reset_world.html?id=' + encodeURIComponent(serverId) +
+              '&slot=' + encodeURIComponent(slotId);
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  btnBack.addEventListener('click', goBack);
+
+  /* ==========================================================
+     键盘：↑/↓ 移动、Enter 上传、Esc 返回
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { e.preventDefault(); goBack(); return; }
+
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (saves.length === 0) return;
+      var next = selectedIndex < 0 ? 0 : selectedIndex + (e.key === 'ArrowUp' ? -1 : 1);
+      if (next < 0) next = 0;
+      if (next >= saves.length) next = saves.length - 1;
+      setSelected(next);
+      var item = listEl.querySelectorAll('.rus-item')[next];
+      if (item && item.scrollIntoView) item.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!btnUp.disabled) doUpload();
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  renderList();
+  setSelected(-1);
+
+})();
+</script>
+
+</body>
+</html>

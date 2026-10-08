@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Reset World</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/realms/slot_frame.png">
+<link rel="preload" as="image" href="assets/realms/new_world.png">
+<link rel="preload" as="image" href="assets/realms/upload.png">
+<link rel="preload" as="image" href="assets/realms/survival_spawn.png">
+<link rel="preload" as="image" href="assets/realms/adventure.png">
+<link rel="preload" as="image" href="assets/realms/experience.png">
+<link rel="preload" as="image" href="assets/realms/inspiration.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .rrw-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rrw-root > * { pointer-events: auto; }
+
+  /* Title @ (w/2, 7) */
+  .rrw-title {
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    top: 7px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none; white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* Subtitle @ (w/2, 22)，红色 */
+  .rrw-subtitle {
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    top: 22px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #FF0000;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none; white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* Frame 容器 60×60 */
+  .rrw-frame {
+    position: absolute;
+    width: 60px; height: 60px;
+    cursor: pointer;
+    box-sizing: border-box;
+    background-size: 56px 56px;
+    background-position: 2px 2px;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+  }
+  .rrw-frame::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: url('assets/realms/slot_frame.png') no-repeat center / 100% 100%;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+  .rrw-frame:hover {
+    filter: brightness(0.56);
+  }
+
+  /* Frame 上方文字，居中，y - 12 */
+  .rrw-frame-label {
+    position: absolute;
+    left: 0; right: 0;
+    top: -12px;
+    text-align: center;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .rrw-frame:hover .rrw-frame-label {
+    color: #A0A0A0;
+  }
+
+  /* 底部 Cancel：80×20，row(14)-10 = 280-10 = 270 */
+  .rrw-btn-cancel {
+    position: absolute;
+    left: calc(50% - 40px);
+    top: 270px;
+  }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rrw-root" id="rrw-root">
+
+  <div class="rrw-title" id="rrw-title">Reset World</div>
+  <div class="rrw-subtitle" id="rrw-subtitle">Your current world will be replaced, this cannot be undone!</div>
+
+  <div class="rrw-frame" id="frm-generate">
+    <div class="rrw-frame-label">Generate</div>
+  </div>
+  <div class="rrw-frame" id="frm-upload">
+    <div class="rrw-frame-label">Upload</div>
+  </div>
+  <div class="rrw-frame" id="frm-template">
+    <div class="rrw-frame-label">Template</div>
+  </div>
+  <div class="rrw-frame" id="frm-adventure">
+    <div class="rrw-frame-label">Adventure</div>
+  </div>
+  <div class="rrw-frame" id="frm-experience">
+    <div class="rrw-frame-label">Experience</div>
+  </div>
+  <div class="rrw-frame" id="frm-inspiration">
+    <div class="rrw-frame-label">Inspiration</div>
+  </div>
+
+  <button class="mcbtn mcbtn-80 rrw-btn-cancel" id="btn-cancel" type="button">Cancel</button>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     参数
+     ========================================================== */
+  var params   = new URLSearchParams(location.search);
+  var serverId = params.get('id') || '';
+  var slotParam = params.get('slot') || '';
+
+  if (!serverId) {
+    try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+    catch (e) {}
+  }
+  if (serverId) {
+    try { localStorage.setItem('mc_realms_server_id', serverId); }
+    catch (e) {}
+  }
+
+  /* 目标 slot：URL 参数优先，否则 server.activeSlot */
+  var slotId = parseInt(slotParam, 10);
+  if (!(slotId >= 1 && slotId <= 3)) slotId = 0;   /* 0 表示等会从 server 读 */
+
+  /* ==========================================================
+     序列化
+     ========================================================== */
+  var STORAGE_KEY = 'mc_realms';
+  var FN_KEY = '__fn__';
+
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) {}
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return deserialize(JSON.parse(raw));
+    } catch (e) { return null; }
+  }
+
+  function saveData(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data))); } catch (e) {}
+  }
+
+  var DATA = loadData();
+  var server = null;
+  if (DATA && Array.isArray(DATA.servers)) {
+    for (var i = 0; i < DATA.servers.length; i++) {
+      if (DATA.servers[i].id === serverId) { server = DATA.servers[i]; break; }
+    }
+  }
+  if (!server) { location.href = 'realms.html'; return; }
+  if (slotId === 0) slotId = server.activeSlot || 1;
+
+  /* ==========================================================
+     布局
+     frame(i) = w/2 - 130 + (i-1)*100
+     行 y：row(0)+10 = 20；row(6)+20 = 150
+     ========================================================== */
+  var rootEl = document.getElementById('rrw-root');
+
+  function layout() {
+    var W = rootEl.clientWidth || window.innerWidth;
+    var base = W / 2 - 130;
+    var rows = [20, 150];
+
+    var frames = [
+      { el: document.getElementById('frm-generate'),   x: 0 },
+      { el: document.getElementById('frm-upload'),      x: 1 },
+      { el: document.getElementById('frm-template'),    x: 2 },
+      { el: document.getElementById('frm-adventure'),   x: 0, y: 1 },
+      { el: document.getElementById('frm-experience'),  x: 1, y: 1 },
+      { el: document.getElementById('frm-inspiration'), x: 2, y: 1 }
+    ];
+
+    for (var i = 0; i < frames.length; i++) {
+      frames[i].el.style.left = (base + frames[i].x * 100) + 'px';
+      frames[i].el.style.top  = rows[frames[i].y || 0] + 'px';
+    }
+  }
+
+  /* ==========================================================
+     设置每张 frame 的背景图
+     素材缺失时回退到纯色（改 CSS 变量即可替换）
+     ========================================================== */
+  function setBg(id, url) {
+    var el = document.getElementById(id);
+    if (el) el.style.backgroundImage = 'url("' + url + '")';
+  }
+  setBg('frm-generate',   'assets/realms/new_world.png');
+  setBg('frm-upload',     'assets/realms/upload.png');
+  setBg('frm-template',   'assets/realms/survival_spawn.png');
+  setBg('frm-adventure',  'assets/realms/adventure.png');
+  setBg('frm-experience', 'assets/realms/experience.png');
+  setBg('frm-inspiration','assets/realms/inspiration.png');
+
+  /* ==========================================================
+     跳转
+     ========================================================== */
+  function goto(url) {
+  /* 用于你自己 Cancel 时……其实 Cancel 是 back()，不走这里 */
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+}
+
+/* ★ 新：跳子页用这个 —— 不压 reset_world 到栈 */
+function gotoSub(url) {
+  if (window.mcBack && typeof window.mcBack.jumpNoPush === 'function') {
+    window.mcBack.jumpNoPush(url);
+  } else {
+    location.href = url;
+  }
+}
+
+  var baseParams = '?id=' + encodeURIComponent(serverId) + '&slot=' + slotId;
+
+document.getElementById('frm-generate').addEventListener('click', function() {
+  gotoSub('realms_reset_normal.html' + baseParams);
+});
+document.getElementById('frm-upload').addEventListener('click', function() {
+  gotoSub('realms_upload_select.html' + baseParams);
+});
+document.getElementById('frm-template').addEventListener('click', function() {
+  gotoSub('realms_select_template.html' + baseParams +
+          '&type=WORLD_TEMPLATE&title=' + encodeURIComponent('Reset World: Template') +
+          '&from=reset');
+});
+document.getElementById('frm-adventure').addEventListener('click', function() {
+  gotoSub('realms_select_template.html' + baseParams +
+          '&type=ADVENTUREMAP&title=' + encodeURIComponent('Reset World: Adventure') +
+          '&from=reset');
+});
+document.getElementById('frm-experience').addEventListener('click', function() {
+  gotoSub('realms_select_template.html' + baseParams +
+          '&type=EXPERIENCE&title=' + encodeURIComponent('Reset World: Experience') +
+          '&from=reset');
+});
+document.getElementById('frm-inspiration').addEventListener('click', function() {
+  gotoSub('realms_select_template.html' + baseParams +
+          '&type=INSPIRATION&title=' + encodeURIComponent('Reset World: Inspiration') +
+          '&from=reset');
+});
+
+  /* ==========================================================
+     Cancel / Esc
+     ========================================================== */
+  function goBack() {
+    var url = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  document.getElementById('btn-cancel').addEventListener('click', goBack);
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { e.preventDefault(); goBack(); }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  layout();
+  window.addEventListener('resize', layout);
+
+})();
+</script>
+
+</body>
+</html>
