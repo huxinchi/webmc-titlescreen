@@ -396,3 +396,20 @@
 .mcbtn-170:disabled {
   background-image: url('../assets/button/button_disabled_170.png');
 }
+/* ==========================================================
+   Realms Select World Template 专用尺寸
+   ========================================================== */
+
+/* 153×20 —— Select / Cancel */
+.mcbtn-153 {
+  width: 153px;
+  height: 20px;
+  background-image: url('../assets/button/button_153.png');
+}
+.mcbtn-153:hover:not(:disabled),
+.mcbtn-153:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_153.png');
+}
+.mcbtn-153:disabled {
+  background-image: url('../assets/button/button_disabled_153.png');
+}

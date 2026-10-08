@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Select World Template</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/isles.png">
+<link rel="preload" as="image" href="assets/realms/slot_frame.png">
+<link rel="preload" as="image" href="assets/realms/link_icons.png">
+<link rel="preload" as="image" href="assets/realms/trailer_icons.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .rlswt-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rlswt-root > * { pointer-events: auto; }
+
+  .rlswt-title {
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    top: 13px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none; white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .rlswt-warning {
+    position: absolute;
+    left: 0; right: 0;
+    top: 10px;
+    text-align: center;
+    font-size: var(--font-size, 10px);
+    line-height: 10px;
+    color: #3366BB;
+    user-select: none;
+    pointer-events: none;
+    display: none;
+  }
+  .rlswt-warning.visible { display: block; }
+  .rlswt-warning a { color: #3366BB; text-decoration: none; pointer-events: auto; cursor: pointer; }
+  .rlswt-warning a:hover { color: #6C7AF4; text-decoration: underline; }
+
+  .rlswt-list-wrap {
+    position: absolute;
+    left: 0; right: 0;
+    top: 32px;
+    bottom: 40px;
+    overflow-y: auto; overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  .rlswt-root.has-warning .rlswt-list-wrap { top: 30px; }
+
+  .rlswt-list { width: 100%; padding: 0 0 4px 0; }
+
+  /* 条目：280×46，居中 */
+  .rlswt-item {
+    position: relative;
+    width: 280px; height: 46px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    cursor: pointer; user-select: none;
+  }
+  .rlswt-item.selected {
+    background-color: #000000;
+    box-shadow: inset 0 0 0 1px #808080;
+  }
+
+  /* 图片 40×40 @ (3,1)；本体 38×38 贴 (1,1)，slot_frame 40×40 叠在上面 */
+  .rlswt-item-img {
+    position: absolute;
+    left: 3px; top: 1px;
+    width: 40px; height: 40px;
+    background-repeat: no-repeat;
+    background-size: 38px 38px;
+    background-position: 1px 1px;
+    image-rendering: pixelated;
+    box-sizing: border-box;
+    pointer-events: none;
+  }
+  .rlswt-item-img::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: url('assets/realms/slot_frame.png') no-repeat center / 100% 100%;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+
+  .rlswt-item-name {
+    position: absolute; left: 48px; top: 2px;
+    font-size: var(--font-size, 10px); line-height: 9px;
+    color: #FFFFFF; text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 220px; pointer-events: none;
+  }
+  .rlswt-item-author {
+    position: absolute; left: 48px; top: 15px;
+    font-size: var(--font-size, 10px); line-height: 9px;
+    color: #6C6C6C; text-shadow: 1px 1px 0 #1a1a1a;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 200px; pointer-events: none;
+  }
+  .rlswt-item-version {
+    position: absolute; right: 5px; top: 1px;
+    font-size: var(--font-size, 10px); line-height: 9px;
+    color: #6C6C6C; text-shadow: 1px 1px 0 #1a1a1a;
+    white-space: nowrap; pointer-events: none;
+  }
+
+  .rlswt-item-icons {
+    position: absolute; left: 47px; top: 25px;
+    height: 15px;
+    display: flex; align-items: center; gap: 2px;
+    pointer-events: none;
+  }
+  .rlswt-item-recommended {
+    font-size: var(--font-size, 10px); line-height: 15px;
+    color: #4C4C8C; text-shadow: 1px 1px 0 #1a1a1a;
+    white-space: nowrap;
+  }
+  .rlswt-icon {
+    width: 15px; height: 15px;
+    background-repeat: no-repeat;
+    background-position: 0 0;
+    background-size: 30px 15px;
+    image-rendering: pixelated;
+    pointer-events: auto; cursor: pointer;
+  }
+  .rlswt-icon-link    { background-image: url('assets/realms/link_icons.png'); }
+  .rlswt-icon-trailer { background-image: url('assets/realms/trailer_icons.png'); }
+  .rlswt-icon-link:hover, .rlswt-icon-trailer:hover { background-position: -15px 0; }
+
+  .rlswt-btn { position: absolute; bottom: 12px; }
+  .rlswt-btn-select { left: calc(50% - 154px); }
+  .rlswt-btn-back   { left: calc(50% + 6px); }
+
+  /* 加载/错误提示 */
+  .rlswt-status {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    text-align: center;
+    font-size: var(--font-size, 10px);
+    line-height: 10px;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    pointer-events: none;
+    display: none;
+    white-space: pre-line;
+  }
+  .rlswt-status.visible { display: block; }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rlswt-root" id="rlswt-root">
+
+  <div class="rlswt-title" id="rlswt-title">Select World Template</div>
+  <div class="rlswt-warning" id="rlswt-warning"></div>
+
+  <div class="rlswt-list-wrap mc-scroll" id="rlswt-list-wrap">
+    <div class="rlswt-list" id="rlswt-list"></div>
+  </div>
+
+  <div class="rlswt-status" id="rlswt-status"></div>
+
+  <button class="mcbtn mcbtn-153 rlswt-btn rlswt-btn-select" id="btn-select" type="button" disabled>Select</button>
+  <button class="mcbtn mcbtn-153 rlswt-btn rlswt-btn-back"   id="btn-back"   type="button">Cancel</button>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     参数
+     ========================================================== */
+  var params    = new URLSearchParams(location.search);
+  var serverId  = params.get('id') || '';
+  var typeParam = params.get('type') || '';
+
+  if (!serverId) {
+    try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+    catch (e) {}
+  }
+  if (serverId) {
+    try { localStorage.setItem('mc_realms_server_id', serverId); }
+    catch (e) {}
+  }
+
+  /* ==========================================================
+     文案（Realms 无 i18n，硬编码英文）
+     ========================================================== */
+  var TXT = {
+    titleDefault:   'Select World Template',
+    titleMinigame:  'Select Minigame',
+    select:         'Select',
+    cancel:         'Cancel',
+    back:           'Back',
+    infoTooltip:    'Open link',
+    trailerTooltip: 'Watch trailer',
+    warningURL:     'https://beta.minecraft.net/realms/adventure-maps-in-1-9',
+    warning:        'These are adventure maps that work best in 1.9. Click here for more info.',
+    loading:        'Loading templates...',
+    errorLoad:      'Couldn\'t fetch templates from Realms.\nShowing local templates.',
+    empty:          'No templates available.'
+  };
+
+  /* ==========================================================
+     Realms API 端点
+     ★ 参数名（page/size）需以 RealmsClient.java 为准
+     ★ 真实请求还需认证（Cookie: sid=...），浏览器直连必然 CORS 失败
+     ========================================================== */
+  var REALMS_API_BASE = 'https://pc.realms.minecraft.net';
+
+  /* ==========================================================
+     序列化 / 反序列化
+     ========================================================== */
+  var STORAGE_KEY = 'mc_realms';
+  var FN_KEY = '__fn__';
+
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) {}
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return deserialize(JSON.parse(raw));
+    } catch (e) { return null; }
+  }
+
+  function saveData(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data))); } catch (e) {}
+  }
+
+  /* ==========================================================
+     数据
+     ========================================================== */
+  var DATA = loadData();
+  var server = null;
+  if (DATA && Array.isArray(DATA.servers)) {
+    for (var i = 0; i < DATA.servers.length; i++) {
+      if (DATA.servers[i].id === serverId) { server = DATA.servers[i]; break; }
+    }
+  }
+  if (!DATA) DATA = { ownUUID: 'self-uuid', servers: [] };
+  if (!server) server = { id: serverId || 'realm_select', name: 'Realm' };
+
+  var worldType   = typeParam || server.worldType || 'MINIGAME';
+  var isMinigame  = (worldType === 'MINIGAME');
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var rootEl     = document.getElementById('rlswt-root');
+  var titleEl    = document.getElementById('rlswt-title');
+  var warningEl  = document.getElementById('rlswt-warning');
+  var listEl     = document.getElementById('rlswt-list');
+  var statusEl   = document.getElementById('rlswt-status');
+  var btnSelect  = document.getElementById('btn-select');
+  var btnBack    = document.getElementById('btn-back');
+
+  titleEl.textContent   = isMinigame ? TXT.titleMinigame : TXT.titleDefault;
+  btnSelect.textContent = TXT.select;
+  btnBack.textContent   = isMinigame ? TXT.cancel : TXT.back;
+
+  /* 警告提示（仅 ADVENTUREMAP） */
+  if (worldType === 'ADVENTUREMAP') {
+    warningEl.innerHTML = '';
+    var a = document.createElement('a');
+    a.href = 'javascript:void(0)';
+    a.textContent = TXT.warning;
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      window.open(TXT.warningURL, '_blank', 'noopener');
+    });
+    warningEl.appendChild(a);
+    warningEl.classList.add('visible');
+    rootEl.classList.add('has-warning');
+  }
+
+  /* ==========================================================
+     图片处理 —— 对齐 RealmsTextureManager.bindWorldTemplate
+     - image == null → fallback isles.png
+     - image 是 base64 字符串 → data:image/png;base64,...
+     - image 是路径（以 / 或 assets/ 开头）→ 直接当 url
+     ========================================================== */
+  function imageToUrl(image) {
+    if (image == null || image === '') {
+      return 'url("assets/background/isles.png")';
+    }
+    if (/^assets\//i.test(image) || image.charAt(0) === '/') {
+      return 'url("' + image + '")';
+    }
+    /* 视作 base64 */
+    return 'url("data:image/png;base64,' + image + '")';
+  }
+
+  /* ==========================================================
+     模板数据 —— fetch + fallback
+     ========================================================== */
+  var templates = [];
+
+  function renderStatus(text) {
+    if (text) {
+      statusEl.textContent = text;
+      statusEl.classList.add('visible');
+    } else {
+      statusEl.classList.remove('visible');
+    }
+  }
+
+  function fetchTemplates(worldType, page, size) {
+    var url = REALMS_API_BASE +
+              '/worlds/templates/' + encodeURIComponent(worldType) +
+              '?page=' + page + '&size=' + size;
+
+    return fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    }).then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  function loadTemplatesFromServer() {
+    renderStatus(TXT.loading);
+
+    fetchTemplates(worldType, 1, 10)
+      .then(function(json) {
+        var list = (json && Array.isArray(json.templates)) ? json.templates : [];
+        if (list.length === 0) {
+          templates = [];
+          renderStatus(TXT.empty);
+        } else {
+          templates = list;
+          renderStatus('');
+        }
+        renderList();
+        restoreSelection();
+      })
+      .catch(function(err) {
+        /* CORS / 401 / 网络失败 → 本地 mock */
+        console.warn('[select_template] fetch failed, fallback to mock:', err);
+        templates = buildMockTemplates();
+        renderStatus(TXT.errorLoad);
+        renderList();
+        restoreSelection();
+      });
+  }
+
+  /* ==========================================================
+     本地 mock —— 结构对齐服务端 JSON
+     image 字段：null → fallback isles.png
+     如果将来你有 base64 数据，直接填字符串即可
+     ========================================================== */
+  function buildMockTemplates() {
+    if (isMinigame) {
+      return [
+        { id: 'mg_spleef',   name: 'Spleef',         author: 'Mojang', version: '1.0.0',
+          link: '', trailer: '', image: null, recommendedPlayers: '2-8',  type: 'MINIGAME' },
+        { id: 'mg_parkour',  name: 'Parkour',        author: 'Mojang', version: '1.0.0',
+          link: '', trailer: '', image: null, recommendedPlayers: '2-10', type: 'MINIGAME' },
+        { id: 'mg_bedwars',  name: 'Bed Wars',       author: 'Mojang', version: '1.2.0',
+          link: '', trailer: '', image: null, recommendedPlayers: '4-8',  type: 'MINIGAME' },
+        { id: 'mg_ludo',     name: 'Ludo',            author: 'Mojang', version: '1.0.0',
+          link: '', trailer: '', image: null, recommendedPlayers: '2-4',  type: 'MINIGAME' },
+        { id: 'mg_hide',     name: 'Hide & Seek',    author: 'Mojang', version: '1.0.0',
+          link: '', trailer: '', image: null, recommendedPlayers: '4-10', type: 'MINIGAME' },
+        { id: 'mg_survival', name: 'Survival Games', author: 'Mojang', version: '1.0.0',
+          link: '', trailer: '', image: null, recommendedPlayers: '8-10', type: 'MINIGAME' }
+      ];
+    }
+    if (worldType === 'ADVENTUREMAP') {
+      return [
+        { id: 'adv_1', name: 'Adventure Map 1', author: 'Mojang', version: '1.0.0',
+          link: TXT.warningURL, trailer: '', image: null, recommendedPlayers: '1-4', type: 'ADVENTUREMAP' },
+        { id: 'adv_2', name: 'Adventure Map 2', author: 'Mojang', version: '1.0.0',
+          link: TXT.warningURL, trailer: '', image: null, recommendedPlayers: '1-4', type: 'ADVENTUREMAP' }
+      ];
+    }
+    return [
+      { id: 'world_1', name: 'SkyBlock',   author: 'Mojang', version: '1.0.0',
+        link: '', trailer: '', image: null, recommendedPlayers: '1-10', type: 'WORLD_TEMPLATE' },
+      { id: 'world_2', name: 'Flat World', author: 'Mojang', version: '1.0.0',
+        link: '', trailer: '', image: null, recommendedPlayers: '1-10', type: 'WORLD_TEMPLATE' }
+    ];
+  }
+
+  /* ==========================================================
+     选中
+     ========================================================== */
+  var selectedIndex = -1;
+
+  function setSelected(idx) {
+    if (idx < 0 || idx >= templates.length) idx = -1;
+    selectedIndex = idx;
+
+    var items = listEl.querySelectorAll('.rlswt-item');
+    for (var i = 0; i < items.length; i++) {
+      items[i].classList.toggle('selected', i === idx);
+    }
+    btnSelect.disabled = (idx < 0);
+  }
+
+  function restoreSelection() {
+    setSelected(-1);
+    if (server.minigameTemplateId) {
+      for (var k = 0; k < templates.length; k++) {
+        if (templates[k].id === server.minigameTemplateId) {
+          setSelected(k);
+          break;
+        }
+      }
+    }
+  }
+
+  /* ==========================================================
+     渲染
+     ========================================================== */
+  function renderList() {
+    listEl.innerHTML = '';
+    for (var i = 0; i < templates.length; i++) {
+      listEl.appendChild(renderItem(templates[i], i));
+    }
+  }
+
+  function renderItem(tpl, index) {
+    var el = document.createElement('div');
+    el.className = 'rlswt-item';
+    el.dataset.index = String(index);
+
+    var img = document.createElement('div');
+    img.className = 'rlswt-item-img';
+    img.style.backgroundImage = imageToUrl(tpl.image);
+    el.appendChild(img);
+
+    var nameEl = document.createElement('div');
+    nameEl.className = 'rlswt-item-name';
+    nameEl.textContent = tpl.name || '';
+    el.appendChild(nameEl);
+
+    var authorEl = document.createElement('div');
+    authorEl.className = 'rlswt-item-author';
+    authorEl.textContent = tpl.author || '';
+    el.appendChild(authorEl);
+
+    var versionEl = document.createElement('div');
+    versionEl.className = 'rlswt-item-version';
+    versionEl.textContent = tpl.version || '';
+    el.appendChild(versionEl);
+
+    var hasRecommended = !!(tpl.recommendedPlayers && tpl.recommendedPlayers !== '');
+    var hasLink        = !!(tpl.link && tpl.link !== '');
+    var hasTrailer     = !!(tpl.trailer && tpl.trailer !== '');
+
+    if (hasRecommended || hasLink || hasTrailer) {
+      var iconsEl = document.createElement('div');
+      iconsEl.className = 'rlswt-item-icons';
+
+      if (hasRecommended) {
+        var recEl = document.createElement('span');
+        recEl.className = 'rlswt-item-recommended';
+        recEl.textContent = tpl.recommendedPlayers;
+        iconsEl.appendChild(recEl);
+      }
+      if (hasLink) {
+        var linkEl = document.createElement('span');
+        linkEl.className = 'rlswt-icon rlswt-icon-link';
+        linkEl.dataset.tooltip = TXT.infoTooltip;
+        linkEl.addEventListener('click', function(e) {
+          e.stopPropagation();
+          window.open(tpl.link, '_blank', 'noopener');
+        });
+        iconsEl.appendChild(linkEl);
+      }
+      if (hasTrailer) {
+        var trailerEl = document.createElement('span');
+        trailerEl.className = 'rlswt-icon rlswt-icon-trailer';
+        trailerEl.dataset.tooltip = TXT.trailerTooltip;
+        trailerEl.addEventListener('click', function(e) {
+          e.stopPropagation();
+          window.open(tpl.trailer, '_blank', 'noopener');
+        });
+        iconsEl.appendChild(trailerEl);
+      }
+      el.appendChild(iconsEl);
+    }
+
+    el.addEventListener('click', function() { setSelected(index); });
+    el.addEventListener('dblclick', function() {
+      setSelected(index);
+      confirmSelection();
+    });
+
+    return el;
+  }
+
+  /* ==========================================================
+     确认
+     ========================================================== */
+  function confirmSelection() {
+    if (selectedIndex < 0 || selectedIndex >= templates.length) return;
+
+    var tpl = templates[selectedIndex];
+
+    /* 对齐 Java 的 SwitchMinigameTask：只传 template，由任务层决定写哪些字段 */
+    server.minigameTemplateId  = tpl.id;
+    server.minigameName        = tpl.name;
+    server.minigameImage       = tpl.image || '';
+    server.minigameAuthor      = tpl.author || '';
+    server.minigameVersion     = tpl.version || '';
+    server.minigameRecommended = tpl.recommendedPlayers || '';
+
+    /* 只有 MINIGAME 类型的模板才切 worldType
+       （对齐 callback() 里的 type 判断） */
+    if (tpl.type === 'MINIGAME') {
+      server.worldType = 'MINIGAME';
+    }
+
+    saveData(DATA);
+    goBack();
+  }
+
+  function goBack() {
+    var url = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  btnSelect.addEventListener('click', function() {
+    if (btnSelect.disabled) return;
+    confirmSelection();
+  });
+  btnBack.addEventListener('click', goBack);
+
+  /* ==========================================================
+     键盘
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { e.preventDefault(); goBack(); return; }
+
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (templates.length === 0) return;
+      var next = selectedIndex < 0 ? 0 : selectedIndex + (e.key === 'ArrowUp' ? -1 : 1);
+      if (next < 0) next = 0;
+      if (next >= templates.length) next = templates.length - 1;
+      setSelected(next);
+      var item = listEl.querySelectorAll('.rlswt-item')[next];
+      if (item && item.scrollIntoView) item.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!btnSelect.disabled) confirmSelection();
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  loadTemplatesFromServer();
+
+})();
+</script>
+
+</body>
+</html>
