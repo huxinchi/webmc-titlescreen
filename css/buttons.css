@@ -379,3 +379,20 @@
 .mcbtn-106:disabled {
   background-image: url('../assets/button/button_disabled_106.png');
 }
+/* ==========================================================
+   Realms Slot Options 专用尺寸
+   ========================================================== */
+
+/* 170×20 —— PvP / Game Mode / Spawn Animals / Difficulty / ... / Done / Cancel */
+.mcbtn-170 {
+  width: 170px;
+  height: 20px;
+  background-image: url('../assets/button/button_170.png');
+}
+.mcbtn-170:hover:not(:disabled),
+.mcbtn-170:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_170.png');
+}
+.mcbtn-170:disabled {
+  background-image: url('../assets/button/button_disabled_170.png');
+}

@@ -1,27 +1,36 @@
 /* ==========================================================
    OptionsList —— 通用选项列表
    源码 OptionsList.addSmall：每行 2 个 150 宽控件，间隔 8
+
+   可通过 CSS 变量覆盖宽 / 间隙：
+     --opt-ctrl-w      单个小控件宽（默认 150px）
+     --opt-gap         行内间隙（默认 8px）
+     --opt-ctrl-big-w  整行控件宽（默认 310px）
+   父级容器设一次即可覆盖全表。
    ========================================================== */
 
-/* 每行：308 宽（150×2 + 8），居中，高 20 */
+/* 每行：默认 308 宽（150×2 + 8），居中，高 20 */
 .mc-options-row {
-  width: 308px;
+  width: calc(var(--opt-ctrl-w, 150px) * 2 + var(--opt-gap, 8px));
   height: 20px;
   margin: 0 auto 2px auto;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--opt-gap, 8px);
   box-sizing: border-box;
 }
 
-/* 行内每个控件 150×20 */
+/* 行内每个控件：默认 150×20 */
+/* 行内每个控件：默认 150×20（EditBox 少 4px，对齐源码 column1_x + 2） */
 .mc-options-row > .mcbtn,
-.mc-options-row > .mc-slider {
-  flex: 0 0 150px;
-  width: 150px;
+.mc-options-row > .mc-slider,
+.mc-options-row > .mc-input {
+  flex: 0 0 var(--opt-ctrl-w, 150px);
+  width:  var(--opt-ctrl-w, 150px);
   height: 20px;
   box-sizing: border-box;
 }
+
 
 /* 禁用行 */
 .mc-options-row.mc-options-row-disabled {
@@ -56,6 +65,8 @@
 /* 手柄在值文本上方 */
 .mc-options-row > .mc-slider .mc-slider-handle { z-index: 2; }
 .mc-options-row > .mc-slider .mc-slider-track  { z-index: 0; }
+
+/* 分区标题 */
 .mc-options-header {
   text-align: center;
   color: #ffffff;
@@ -68,22 +79,19 @@
   user-select: none;
 }
 
-.mc-options-row-big {
-  justify-content: center;
-}
 /* ==========================================================
-   整行（addBig，310 宽）—— 排除 150 约束，强制 310
+   整行（addBig，默认 310 宽）
    ========================================================== */
 .mc-options-row-big {
   width: auto;
-  min-width: 310px;
+  min-width: var(--opt-ctrl-big-w, 310px);
   justify-content: center;
 }
 
 .mc-options-row-big > .mcbtn,
 .mc-options-row-big > .mc-slider {
-  flex: 0 0 310px;
-  width: 310px;
+  flex: 0 0 var(--opt-ctrl-big-w, 310px);
+  width: var(--opt-ctrl-big-w, 310px);
   height: 20px;
   box-sizing: border-box;
 }

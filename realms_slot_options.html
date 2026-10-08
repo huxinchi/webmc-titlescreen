@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>World Options</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  /* ==========================================================
+     根容器 —— 用 CSS 变量把 OptionsList 的宽度换成 170
+     ========================================================== */
+  .rlso-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+
+    /* ★ 让 OptionsList 用 170 / gap 10 */
+    --opt-ctrl-w: 170px;
+    --opt-gap:    10px;
+  }
+  .rlso-root > * { pointer-events: auto; }
+
+  /* 标题 @ (w/2, 17) */
+  .rlso-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 17px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* 副标题（非 NORMAL 时）@ (w/2, 26) */
+  .rlso-subtitle {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 26px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #FF5555;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    white-space: nowrap;
+    pointer-events: none;
+    display: none;
+  }
+  .rlso-subtitle.visible { display: block; }
+
+  /* ==========================================================
+     内容区：从 row(1)=30 开始，行距 20px
+     ========================================================== */
+  .rlso-content {
+    position: absolute;
+    left: 0; right: 0;
+    top: 30px;
+    bottom: 30px;
+    overflow: hidden;
+    pointer-events: auto;
+  }
+
+  /* 让 OptionsList 生成的行间距变成 20px（原默认 2px） */
+  .rlso-content .mc-options-row {
+    margin-bottom: 20px;
+  }
+
+
+
+  /* Done/Cancel 行：Java 里 row(9)→row(13) 多 40px */
+  .rlso-footer-row {
+    margin-top: 40px !important;
+  }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rlso-root" id="rlso-root">
+
+  <div class="rlso-title">World Options</div>
+  <div class="rlso-subtitle" id="rlso-subtitle"></div>
+
+  <div class="rlso-content">
+
+    <!-- 第一行：slot name（EditBox）+ PvP —— 手动写，因为 EditBox 不属于 OptionsList 的选项类型 -->
+    <div class="mc-options-row rlso-first-row">
+      <input class="mc-input" id="rlso-slot-name" type="text" maxlength="10" autocomplete="off">
+      <button class="mcbtn mcbtn-170 mc-cycle-btn" id="btn-pvp" type="button"></button>
+    </div>
+
+    <!-- 其余选项交给 OptionsList -->
+    <div id="rlso-list"></div>
+
+    <!-- Done / Cancel -->
+    <div class="mc-options-row rlso-footer-row">
+      <button class="mcbtn mcbtn-170" id="btn-done"   type="button">Done</button>
+      <button class="mcbtn mcbtn-170" id="btn-cancel" type="button">Cancel</button>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     参数
+     ========================================================== */
+  var params   = new URLSearchParams(location.search);
+  var serverId = params.get('id') || '';
+
+  if (!serverId) {
+    try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+    catch (e) {}
+  }
+  if (serverId) {
+    try { localStorage.setItem('mc_realms_server_id', serverId); }
+    catch (e) {}
+  }
+
+  /* ==========================================================
+     文案（Realms 无 i18n，硬编码英文）
+     ========================================================== */
+  var TXT = {
+    subtitleAdventure:'Not all options are available for adventure maps',
+    subtitleInspire:  'Not all options are available for inspiration maps',
+    subtitleMini:     'Not all options are available for minigame worlds',
+    pvp:              'PvP',
+    spawnAnimals:     'Spawn Animals',
+    spawnMonsters:    'Spawn Monsters',
+    spawnNPCs:        'Spawn NPCs',
+    spawnProtection:  'Spawn Protection',
+    commandBlocks:    'Command Blocks',
+    forceGameMode:    'Force Game Mode',
+    difficulty:       'Difficulty',
+    gameMode:         'Game Mode',
+    on:               'On',
+    off:              'Off',
+    difficulties:     ['Peaceful', 'Easy', 'Normal', 'Hard'],
+    gameModes:        ['Survival', 'Creative', 'Adventure'],
+    done:             'Done',
+    cancel:           'Cancel'
+  };
+
+  /* ==========================================================
+     序列化 / 反序列化
+     ========================================================== */
+  var STORAGE_KEY = 'mc_realms';
+  var FN_KEY = '__fn__';
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) {}
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return deserialize(JSON.parse(raw));
+    } catch (e) { return null; }
+  }
+
+  function saveData(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data))); } catch (e) {}
+  }
+
+  /* ==========================================================
+     数据
+     ========================================================== */
+  var DATA = loadData();
+  if (!DATA || !Array.isArray(DATA.servers)) {
+    location.href = 'realms.html';
+    return;
+  }
+
+  var server = null;
+  for (var i = 0; i < DATA.servers.length; i++) {
+    if (DATA.servers[i].id === serverId) { server = DATA.servers[i]; break; }
+  }
+  if (!server) { location.href = 'realms.html'; return; }
+
+  /* activeSlot */
+  var slotId = parseInt(params.get('slot'), 10);
+  if (!(slotId >= 1 && slotId <= 3)) {
+    slotId = server.activeSlot || 1;
+  }
+
+  var worldType = server.worldType || 'NORMAL';
+  var notNormal = (worldType !== 'NORMAL');
+
+  var slot = (server.slots && server.slots[slotId]) || {};
+
+  var defaults = {
+    pvp:             true,
+    spawnAnimals:    true,
+    spawnMonsters:   true,
+    spawnNPCs:       true,
+    spawnProtection: 0,
+    commandBlocks:   true,
+    difficulty:      2,      /* Normal */
+    gameMode:        0,      /* Survival */
+    forceGameMode:   false,
+    slotName:        ''
+  };
+
+  var current = {
+    pvp:             slot.pvp             != null ? slot.pvp             : defaults.pvp,
+    spawnAnimals:    slot.spawnAnimals    != null ? slot.spawnAnimals    : defaults.spawnAnimals,
+    spawnMonsters:   slot.spawnMonsters   != null ? slot.spawnMonsters   : defaults.spawnMonsters,
+    spawnNPCs:       slot.spawnNPCs       != null ? slot.spawnNPCs       : defaults.spawnNPCs,
+    spawnProtection: slot.spawnProtection != null ? slot.spawnProtection : defaults.spawnProtection,
+    commandBlocks:   slot.commandBlocks   != null ? slot.commandBlocks   : defaults.commandBlocks,
+    difficulty:      slot.difficulty      != null ? slot.difficulty      : defaults.difficulty,
+    gameMode:        slot.gameMode        != null ? slot.gameMode        : defaults.gameMode,
+    forceGameMode:   slot.forceGameMode   != null ? slot.forceGameMode   : defaults.forceGameMode,
+    slotName:        slot.slotName || ''
+  };
+
+  /* ==========================================================
+     副标题
+     ========================================================== */
+  if (notNormal) {
+    var sub = document.getElementById('rlso-subtitle');
+    if (worldType === 'ADVENTUREMAP')     sub.textContent = TXT.subtitleAdventure;
+    else if (worldType === 'INSPIRATION') sub.textContent = TXT.subtitleInspire;
+    else                                  sub.textContent = TXT.subtitleMini;
+    sub.classList.add('visible');
+  }
+
+  /* ==========================================================
+     Slot name EditBox
+     ========================================================== */
+  var defaultName   = 'World ' + slotId;
+  var slotNameInput = document.getElementById('rlso-slot-name');
+  slotNameInput.value = current.slotName || defaultName;
+
+  /* ==========================================================
+     PvP —— 手动 CycleButton（不在 OptionsList 里）
+     ========================================================== */
+  var btnPvp = document.getElementById('btn-pvp');
+  var CycleButton = window.mcWidgets && window.mcWidgets.CycleButton;
+
+  function onOff(v) { return v ? TXT.on : TXT.off; }
+  function pvpLabel(v) { return TXT.pvp + ': ' + onOff(v); }
+
+  var pvpCycle = null;
+  if (CycleButton) {
+    pvpCycle = new CycleButton(btnPvp, {
+      values: [true, false],
+      value:  current.pvp,
+      displayState: 'NAME_AND_VALUE',
+      name: TXT.pvp,
+      valueDisplayFn: onOff,
+      onChange: function(v) { current.pvp = v; }
+    });
+    if (notNormal) {
+      btnPvp.disabled = true;
+      btnPvp.classList.add('is-disabled');
+    }
+  }
+
+  /* ==========================================================
+     OptionsList 选项（不含 PvP）
+     ========================================================== */
+  var OPTIONS = {
+    'rlso.gamemode': {
+      type: 'enum', values: [0, 1, 2], value: current.gameMode,
+      name: TXT.gameMode, _meta: 'gameMode'
+    },
+    'rlso.spawnAnimals': {
+      type: 'boolean', value: current.spawnAnimals,
+      name: TXT.spawnAnimals, disabled: notNormal, _meta: 'spawnAnimals'
+    },
+    'rlso.difficulty': {
+      type: 'enum', values: [0, 1, 2, 3], value: current.difficulty,
+      name: TXT.difficulty, _meta: 'difficulty'
+    },
+    'rlso.spawnMonsters': {
+      type: 'boolean', value: current.spawnMonsters,
+      name: TXT.spawnMonsters, disabled: notNormal, _meta: 'spawnMonsters'
+    },
+    'rlso.spawnProt': {
+      type: 'slider', min: 0, max: 16, step: 1, value: current.spawnProtection,
+      name: TXT.spawnProtection, disabled: notNormal, _meta: 'spawnProtection'
+    },
+    'rlso.spawnNPCs': {
+      type: 'boolean', value: current.spawnNPCs,
+      name: TXT.spawnNPCs, disabled: notNormal, _meta: 'spawnNPCs'
+    },
+    'rlso.forceGM': {
+      type: 'boolean', value: current.forceGameMode,
+      name: TXT.forceGameMode, disabled: notNormal, _meta: 'forceGameMode'
+    },
+    'rlso.cmdBlocks': {
+      type: 'boolean', value: current.commandBlocks,
+      name: TXT.commandBlocks, disabled: notNormal, _meta: 'commandBlocks'
+    }
+  };
+
+  var ROWS = [
+    ['rlso.gamemode',     'rlso.spawnAnimals'],
+    ['rlso.difficulty',   'rlso.spawnMonsters'],
+    ['rlso.spawnProt',    'rlso.spawnNPCs'],
+    ['rlso.forceGM',      'rlso.cmdBlocks']
+  ];
+
+  /* ==========================================================
+     值显示 / 完整标签
+     ========================================================== */
+  function valueText(opt, v) {
+    switch (opt._meta) {
+      case 'difficulty':      return TXT.difficulties[v];
+      case 'gameMode':        return TXT.gameModes[v];
+      case 'spawnProtection': return v <= 0 ? TXT.off : String(v);
+      default:                return v ? TXT.on : TXT.off;
+    }
+  }
+
+  function fullLabel(opt, v) {
+    return opt.name + ': ' + valueText(opt, v);
+  }
+
+  /* ==========================================================
+     数据桥接：server.slots[slotId] ↔ window.mcOptions
+     - 页面加载：写入 mcOptions（带 rlso.* 前缀，避免撞全局 options）
+     - 保存：从 mcOptions 读回 server.slots[slotId]
+     ========================================================== */
+  var mcOptions = window.mcOptions;
+
+  /* 写入 mcOptions（构造 OptionsList 前完成，OptionsList 会读 mcOptions） */
+  mcOptions.set('rlso.gamemode',     current.gameMode);
+  mcOptions.set('rlso.spawnAnimals', current.spawnAnimals);
+  mcOptions.set('rlso.difficulty',   current.difficulty);
+  mcOptions.set('rlso.spawnMonsters',current.spawnMonsters);
+  mcOptions.set('rlso.spawnProt',    current.spawnProtection);
+  mcOptions.set('rlso.spawnNPCs',    current.spawnNPCs);
+  mcOptions.set('rlso.forceGM',      current.forceGameMode);
+  mcOptions.set('rlso.cmdBlocks',    current.commandBlocks);
+
+  /* ==========================================================
+     渲染 OptionsList
+     ========================================================== */
+  var listEl = document.getElementById('rlso-list');
+
+  if (window.mcWidgets && window.mcWidgets.OptionsList) {
+    new window.mcWidgets.OptionsList(listEl, {
+      options: OPTIONS,
+      rows: ROWS,
+      /* 自定义控件类名 —— 走 170 宽按钮 / slider */
+      smallBtnCls:    'mcbtn mcbtn-170',
+      bigBtnCls:      'mcbtn mcbtn-170',
+      smallSliderCls: 'mc-slider mc-slider-170',
+      bigSliderCls:   'mc-slider mc-slider-170',
+
+      /* 值显示 / 完整标签 */
+      valueText: valueText,
+      fullLabel: fullLabel,
+
+      /* t 用于给 label 提供文案 —— 直接返回 opt.name */
+      t: function(key) {
+        var o = OPTIONS[key];
+        return o && o.name ? o.name : key;
+      }
+    });
+  }
+
+  /* ==========================================================
+     Peaceful 时禁用 Spawn Monsters
+     —— 监听 difficulty 的 optionchange（OptionsList 派发的自定义事件）
+     ========================================================== */
+  listEl.addEventListener('optionchange', function(e) {
+    var key = e.detail.id;
+    var val = e.detail.value;
+
+    /* difficulty 变了 → 同步禁用/启用 spawnMonsters */
+    if (key === 'rlso.difficulty') {
+      current.difficulty = val;
+
+      var mb = listEl.querySelector('button[data-key="rlso.spawnMonsters"]');
+      if (mb) {
+        if (val === 0) { mb.disabled = true;  mb.classList.add('is-disabled'); }
+        else           { mb.disabled = false; mb.classList.remove('is-disabled'); }
+      }
+      return;
+    }
+
+    /* 其他选项：写回 current */
+    if (key === 'rlso.gamemode')     current.gameMode = val;
+    if (key === 'rlso.spawnAnimals') current.spawnAnimals = val;
+    if (key === 'rlso.spawnMonsters')current.spawnMonsters = val;
+    if (key === 'rlso.spawnProt')    current.spawnProtection = Math.round(val);
+    if (key === 'rlso.spawnNPCs')    current.spawnNPCs = val;
+    if (key === 'rlso.forceGM')      current.forceGameMode = val;
+    if (key === 'rlso.cmdBlocks')    current.commandBlocks = val;
+  });
+
+  /* ==========================================================
+     保存
+     - 非 NORMAL：只写 difficulty / gameMode / slotName
+     - NORMAL：全部写
+     ========================================================== */
+  function save() {
+    if (!server.slots) server.slots = {};
+    if (!server.slots[slotId]) server.slots[slotId] = {};
+
+    var s = server.slots[slotId];
+
+    /* slot 名：等于默认名则存空串（对齐 Java 的 getSlotName） */
+    var nm = (slotNameInput.value || '').trim();
+    s.slotName = (nm === defaultName) ? '' : nm;
+    s.name     = s.slotName || defaultName;
+
+    /* 难度 / 游戏模式：任何 worldType 都写 */
+    s.difficulty = current.difficulty;
+    s.gameMode   = current.gameMode;
+
+    /* 其余字段：仅 NORMAL 写回，非 NORMAL 保留原值（对齐 Java 的 saveSettings 分支） */
+    if (!notNormal) {
+      s.pvp             = current.pvp;
+      s.spawnAnimals    = current.spawnAnimals;
+      s.spawnMonsters   = current.spawnMonsters;
+      s.spawnNPCs       = current.spawnNPCs;
+      s.spawnProtection = current.spawnProtection;
+      s.commandBlocks   = current.commandBlocks;
+      s.forceGameMode   = current.forceGameMode;
+    }
+
+    saveData(DATA);
+  }
+
+  /* ==========================================================
+     Done / Cancel
+     ========================================================== */
+  function goBack() {
+    var url = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  document.getElementById('btn-done').addEventListener('click', function() {
+    save();
+    goBack();
+  });
+
+  document.getElementById('btn-cancel').addEventListener('click', function() {
+    goBack();
+  });
+
+  /* Enter → Done；Esc → Cancel */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      save();
+      goBack();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      goBack();
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  try { slotNameInput.focus(); } catch (e) {}
+
+})();
+</script>
+
+</body>
+</html>

@@ -117,3 +117,15 @@
 .mc-slider-310:focus .mc-slider-track {
   background-image: url('../assets/slider/slider_highlighted_310.png');
 }
+/* ==========================================================
+   170×20 Slider（Realms Slot Options 专用）
+   ========================================================== */
+.mc-slider-170 {
+  width: 170px;
+}
+.mc-slider-170 .mc-slider-track {
+  background-image: url('../assets/slider/slider_170.png');
+}
+.mc-slider-170:focus .mc-slider-track {
+  background-image: url('../assets/slider/slider_highlighted_170.png');
+}

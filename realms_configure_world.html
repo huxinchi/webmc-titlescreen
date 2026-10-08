@@ -672,27 +672,30 @@ btnBack.style.left = 'calc(50% + 118px)';
   }
 });
   btnSettings.addEventListener('click', function() {
-    placeholder('Settings');
-  });
+  var url = 'realms_settings.html?id=' + encodeURIComponent(serverId);
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+});
 
-
-// 改成
 btnSubscription.addEventListener('click', function() {
   var url = 'realms_subscription.html?id=' + encodeURIComponent(serverId);
   if (window.mcBack && typeof window.mcBack.jump === 'function') {
     window.mcBack.jump(url);
   } else {
-    location.href = url;   // 兜底
+    location.href = url;
   }
 });
 
-// 改成
 btnOptions.addEventListener('click', function() {
-  var url = 'realms_settings.html?id=' + encodeURIComponent(serverId);
+  var url = 'realms_slot_options.html?id=' + encodeURIComponent(serverId) +
+            '&slot=' + encodeURIComponent(activeSlot);
   if (window.mcBack && typeof window.mcBack.jump === 'function') {
     window.mcBack.jump(url);
   } else {
-    location.href = url;   // 兜底
+    location.href = url;
   }
 });
   btnBackup.addEventListener('click', function() {

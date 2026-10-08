@@ -13,7 +13,12 @@
          // 可选覆盖：
          t:         function(key) {...},
          valueText: function(opt, v) {...},
-         fullLabel: function(opt, v) {...}
+         fullLabel: function(opt, v) {...},
+         // 可选：控件类名（默认走 150 / 310）
+         smallBtnCls:    'mcbtn mcbtn-150',
+         bigBtnCls:      'mcbtn mcbtn-310',
+         smallSliderCls: 'mc-slider',
+         bigSliderCls:   'mc-slider mc-slider-310'
        });
 
      rows 支持四种形态：
@@ -125,6 +130,12 @@
     this.rows    = opts.rows    || [];
     this.t       = opts.t || defaultT;
 
+    /* ★ 控件类名可配 —— 默认保持原样（150 / 310） */
+    this.smallBtnCls    = opts.smallBtnCls    || 'mcbtn mcbtn-150';
+    this.bigBtnCls      = opts.bigBtnCls      || 'mcbtn mcbtn-310';
+    this.smallSliderCls = opts.smallSliderCls || 'mc-slider';
+    this.bigSliderCls   = opts.bigSliderCls   || 'mc-slider mc-slider-310';
+
     var self = this;
 
     this.valueText = opts.valueText || function(opt, v) {
@@ -206,14 +217,16 @@
     width = width || 150;
     var self = this;
 
-    /* 宽度只决定类名，其它地方不碰 width */
-    var btnCls = (width >= 310) ? 'mcbtn mcbtn-310' : 'mcbtn mcbtn-150';
-    var sldCls = (width >= 310) ? 'mc-slider mc-slider-310' : 'mc-slider';
+    /* ★ 宽度只决定用哪套类名，其它地方不碰 width */
+    var isBig  = (width >= 310);
+    var btnCls = isBig ? this.bigBtnCls      : this.smallBtnCls;
+    var sldCls = isBig ? this.bigSliderCls   : this.smallSliderCls;
 
     /* --- button --- */
     if (opt.type === 'button') {
       var a = document.createElement('a');
       a.className = btnCls;
+      a.dataset.key = key;
       a.href = opt.href || '#';
       a.textContent = self.t(opt.key);
       return a;
@@ -224,6 +237,7 @@
       var btn = document.createElement('button');
       btn.className = btnCls + ' mc-cycle-btn';
       btn.type = 'button';
+      btn.dataset.key = key;
       if (opt.disabled) btn.disabled = true;
 
       var values;
@@ -259,6 +273,7 @@
     if (opt.type === 'slider') {
       var slider = document.createElement('div');
       slider.className = sldCls;
+      slider.dataset.key = key;
       slider.dataset.min  = opt.min;
       slider.dataset.max  = opt.max;
       slider.dataset.step = opt.step;

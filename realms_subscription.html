@@ -422,18 +422,16 @@
       }
       saveData(DATA);
 
-      /* 清掉 serverId，避免其它页面残留 */
-      try { localStorage.removeItem('mc_realms_server_id'); } catch (e) {}
+   /* 清掉 serverId，避免其它页面残留 */
+try { localStorage.removeItem('mc_realms_server_id'); } catch (e) {}
 
-      /* 回主列表（栈里的所有页面都要跳过） */
-      var url = 'realms.html';
-      if (window.mcBack && typeof window.mcBack.back === 'function') {
-        /* 直接跳，不走栈 —— 因为 Realm 已删，中间页都无效了 */
-        location.href = url;
-      } else {
-        location.href = url;
-      }
-    }
+/* 退到栈里的 realms.html —— 保留它自带的 fromurl，弹掉中间页 */
+if (!window.mcBack ||
+    typeof window.mcBack.backTo !== 'function' ||
+    !window.mcBack.backTo('realms.html')) {
+  /* 兜底：栈里没有 realms.html（比如直接刷新订阅页），只能裸跳 */
+  location.href = 'realms.html';
+}}
   })();
 
   /* ==========================================================

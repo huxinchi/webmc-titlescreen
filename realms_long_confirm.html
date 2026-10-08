@@ -177,13 +177,13 @@
     } catch (e) {}
   }
 
-  function goBack() {
-    if (window.mcBack && typeof window.mcBack.back === 'function') {
-      window.mcBack.back(back);
-    } else {
-      location.href = back;
-    }
+function goBack() {
+  if (window.mcBack && typeof window.mcBack.jumpNoPush === 'function') {
+    window.mcBack.jumpNoPush(back);
+  } else {
+    location.href = back;
   }
+}
 
   yesBtn.addEventListener('click', function(e) {
     e.preventDefault();

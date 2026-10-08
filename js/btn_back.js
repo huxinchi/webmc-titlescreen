@@ -238,7 +238,31 @@
     if (!target) return;
     var s = readStack();
     location.href = updateFromUrl(target, s);
+  },
+  /* ========================================================
+   backTo：退到栈里某个已存在的页面
+   - 从栈顶往下找第一个匹配项
+   - 以那一项为跳转目标，弹掉它之后的全部
+   - 未找到 → 返回 false（调用方自行 fallback）
+   匹配：完全相等 或 以 "page?" 开头（带查询参数的变体）
+   ======================================================== */
+backTo: function(page) {
+  if (!page) return false;
+  var stack = readStack();
+  var idx = -1;
+  for (var i = stack.length - 1; i >= 0; i--) {
+    if (stack[i] === page || stack[i].indexOf(page + '?') === 0) {
+      idx = i;
+      break;
+    }
   }
+  if (idx < 0) return false;
+
+  var target   = stack[idx];
+  var newStack = stack.slice(0, idx);
+  location.href = updateFromUrl(target, newStack);
+  return true;
+}
 };
  
 
