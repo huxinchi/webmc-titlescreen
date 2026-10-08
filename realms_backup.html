@@ -569,28 +569,17 @@
       'yesno', 2);
   }
 
-  function doDownload() {
-    /* 网页版无实际下载，模拟：生成一个文本文件让浏览器下载 */
-    try {
-      var b = backups[0];
-      var content =
-        'Realm: ' + (server.name || '') + '\n' +
-        'Backup ID: ' + b.backupId + '\n' +
-        'Date: ' + datePresentation(b.lastModifiedDate) + '\n' +
-        'Size: ' + b.size + ' bytes\n';
-      var blob = new Blob([content], { type: 'text/plain' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = (server.name || 'realm') + '_backup_' + b.backupId + '.txt';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
-    } catch (e) {}
-
-    goBack();
+function doDownload() {
+  /* 跳下载进度页 */
+  var url = 'realms_download.html?id=' + encodeURIComponent(serverId) +
+            '&slot=' + slotId +
+            '&name=' + encodeURIComponent(server.name || 'Realm');
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
   }
+}
 
   /* ==========================================================
      long_confirm

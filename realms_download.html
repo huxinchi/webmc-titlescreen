@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Downloading World</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .dl-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .dl-root > * { pointer-events: auto; }
+
+  /* 标题 @ (w/2, 20) */
+  .dl-title {
+    position: absolute;
+    left: 0; right: 0;
+    top: 20px;
+    text-align: center;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* 状态 @ (w/2, 50) */
+  .dl-status-wrap {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50px;
+    text-align: center;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .dl-dots { margin-left: 5px; }
+
+  /* 进度条 */
+  .dl-progress-outer {
+    position: absolute;
+    left: calc(50% - 100px);
+    top: 79px;
+    height: 17px;
+    width: 0;
+    background: #D9D2D2;
+    pointer-events: none;
+  }
+  .dl-progress-inner {
+    position: absolute;
+    left: 1px; top: 1px;
+    height: 15px;
+    width: 0;
+    background: #808080;
+  }
+
+  /* 进度 + 速度 @ y=84 */
+  .dl-progress-info {
+    position: absolute;
+    left: 0; right: 0;
+    top: 84px;
+    text-align: center;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .dl-speed { margin-left: 15px; }
+
+  /* 错误 @ (w/2, 110) */
+  .dl-error {
+    position: absolute;
+    left: 0; right: 0;
+    top: 110px;
+    text-align: center;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #FF0000;
+    text-shadow: 1px 1px 0 #3f0000;
+    user-select: none;
+    pointer-events: none;
+    white-space: nowrap;
+    display: none;
+  }
+  .dl-error.visible { display: block; }
+
+  /* Cancel @ (w/2 - 100, h - 42) */
+  .dl-btn {
+    position: absolute;
+    left: calc(50% - 100px);
+    bottom: 22px;
+  }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="dl-root" id="dl-root">
+
+  <div class="dl-title">Downloading World</div>
+
+  <div class="dl-status-wrap">
+    <span id="dl-status"></span><span class="dl-dots" id="dl-dots"></span>
+  </div>
+
+  <div class="dl-progress-outer" id="dl-progress-outer">
+    <div class="dl-progress-inner" id="dl-progress-inner"></div>
+  </div>
+
+  <div class="dl-progress-info">
+    <span id="dl-pct">0.0</span> <span>%</span><span class="dl-speed" id="dl-speed"></span>
+  </div>
+
+  <div class="dl-error" id="dl-error"></div>
+
+  <button class="mcbtn mcbtn-long dl-btn" id="dl-btn" type="button" data-mode="cancel">Cancel</button>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     参数
+     ========================================================== */
+  var params   = new URLSearchParams(location.search);
+  var serverId = params.get('id') || '';
+  var slotParam = params.get('slot') || '';
+  var worldName = params.get('name') || 'World';
+
+  if (!serverId) {
+    try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+    catch (e) {}
+  }
+  if (serverId) {
+    try { localStorage.setItem('mc_realms_server_id', serverId); }
+    catch (e) {}
+  }
+
+  var slotId = parseInt(slotParam, 10);
+  if (!(slotId >= 1 && slotId <= 3)) slotId = 1;
+
+  /* ==========================================================
+     文案
+     ========================================================== */
+  var TXT = {
+    preparing:  'Preparing...',
+    downloading:'Downloading %s...',
+    extracting: 'Extracting...',
+    done:       'Done',
+    cancelled:  'Cancelled',
+    failed:     'Download failed'
+  };
+
+  /* ==========================================================
+     DOTS
+     ========================================================== */
+  var DOTS = ['', '.', '. .', '. . .'];
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var statusEl   = document.getElementById('dl-status');
+  var dotsEl     = document.getElementById('dl-dots');
+  var outerEl    = document.getElementById('dl-progress-outer');
+  var innerEl    = document.getElementById('dl-progress-inner');
+  var pctEl      = document.getElementById('dl-pct');
+  var speedEl    = document.getElementById('dl-speed');
+  var errorEl    = document.getElementById('dl-error');
+  var btnEl      = document.getElementById('dl-btn');
+
+  /* ==========================================================
+     状态
+     ========================================================== */
+  var status         = TXT.preparing;
+  var progressPct    = 0;
+  var bytesWritten   = 0;
+  var totalBytes     = 80 * 1024 * 1024;
+  var bytesPerSec    = 0;
+  var lastWritten    = 0;
+  var lastTimeSnap   = Date.now();
+  var cancelled      = false;
+  var finished       = false;
+  var extracting     = false;
+  var showDots       = true;
+  var dotIndex       = 0;
+  var animTick       = 0;
+
+  /* ==========================================================
+     工具
+     ========================================================== */
+  function humanReadableSpeed(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    var exp = Math.floor(Math.log(bytes) / Math.log(1024));
+    var pre = 'KMGTPE'.charAt(exp - 1);
+    return (bytes / Math.pow(1024, exp)).toFixed(1) + ' ' + pre + 'B/s';
+  }
+
+  /* ==========================================================
+     渲染
+     ========================================================== */
+  function setStatus(text) {
+    status = text;
+    statusEl.textContent = text;
+  }
+
+  function renderProgress() {
+    if (totalBytes <= 0) return;
+    var pct = (bytesWritten / totalBytes) * 100;
+    if (pct > 100) pct = 100;
+    progressPct = pct;
+
+    var px = 200 * pct / 100;
+    outerEl.style.width = (px + 1) + 'px';
+    innerEl.style.width = px + 'px';
+    pctEl.textContent = pct.toFixed(1);
+  }
+
+  function renderSpeed() {
+    if (bytesPerSec > 0) {
+      speedEl.textContent = '(' + humanReadableSpeed(bytesPerSec) + ')';
+    } else {
+      speedEl.textContent = '';
+    }
+  }
+
+  /* ==========================================================
+     按钮
+     ========================================================== */
+  function setButton(mode) {
+    btnEl.dataset.mode = mode;
+    if (mode === 'cancel') btnEl.textContent = 'Cancel';
+    else if (mode === 'done') btnEl.textContent = 'Done';
+    else btnEl.textContent = 'Back';
+  }
+
+  /* ==========================================================
+     Mock 下载流程
+     ========================================================== */
+  var mockTimer = null;
+  var MOCK_DURATION = 4000;
+  var EXTRACT_PCT = 0.92;   /* 92% 后进入 extracting */
+
+  function startMockDownload() {
+    setStatus(TXT.downloading.replace('%s', worldName));
+
+    var startTime = Date.now();
+    lastTimeSnap = startTime;
+    lastWritten = 0;
+
+    mockTimer = setInterval(function() {
+      if (cancelled || finished) {
+        clearInterval(mockTimer);
+        return;
+      }
+
+      var elapsed = Date.now() - startTime;
+      var ratio = Math.min(1, elapsed / MOCK_DURATION);
+
+      if (elapsed < 400) {
+        setStatus(TXT.preparing);
+        bytesWritten = 0;
+      } else {
+        if (status === TXT.preparing) {
+          setStatus(TXT.downloading.replace('%s', worldName));
+        }
+
+        var base = Math.floor(totalBytes * (ratio - 0.1) / 0.9);
+        var jitter = Math.floor(Math.random() * 50000);
+        bytesWritten = Math.min(totalBytes, base + jitter);
+      }
+
+      /* 达到 92% → 进入 extracting */
+      if (!extracting && bytesWritten >= totalBytes * EXTRACT_PCT) {
+        extracting = true;
+        setStatus(TXT.extracting);
+      }
+
+      renderProgress();
+
+      var now = Date.now();
+      if (now - lastTimeSnap >= 1000) {
+        var dt = now - lastTimeSnap;
+        bytesPerSec = 1000 * (bytesWritten - lastWritten) / dt;
+        lastWritten = bytesWritten;
+        lastTimeSnap = now;
+      }
+      renderSpeed();
+
+      /* 达到 100% + 800ms → 完成 */
+      if (bytesWritten >= totalBytes) {
+        clearInterval(mockTimer);
+        setTimeout(function() {
+          if (cancelled) return;
+          finished = true;
+          showDots = false;
+          setStatus(TXT.done);
+          setButton('done');
+        }, 800);
+      }
+    }, 50);
+  }
+
+  /* ==========================================================
+     动画 tick
+     ========================================================== */
+  var tickTimer = setInterval(function() {
+    animTick++;
+    if (showDots) {
+      if (animTick % 10 === 0) dotIndex++;
+      dotsEl.textContent = DOTS[dotIndex % DOTS.length];
+    } else {
+      dotsEl.textContent = '';
+    }
+  }, 50);
+
+  /* ==========================================================
+     取消 / 返回
+     ========================================================== */
+  function goBack() {
+    var url = 'realms_backup.html?id=' + encodeURIComponent(serverId) +
+              '&slot=' + slotId;
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  function doCancel() {
+    if (finished) { goBack(); return; }
+    cancelled = true;
+    if (mockTimer) clearInterval(mockTimer);
+    setStatus(TXT.cancelled);
+    showDots = false;
+    setButton('done');
+    setTimeout(goBack, 400);
+  }
+
+  btnEl.addEventListener('click', function() {
+    if (btnEl.dataset.mode === 'cancel') doCancel();
+    else goBack();
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      doCancel();
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  setStatus(TXT.preparing);
+  setButton('cancel');
+  renderProgress();
+  renderSpeed();
+
+  setTimeout(startMockDownload, 200);
+
+  window.addEventListener('beforeunload', function() {
+    if (mockTimer) clearInterval(mockTimer);
+    if (tickTimer) clearInterval(tickTimer);
+  });
+
+})();
+</script>
+
+</body>
+</html>

@@ -382,50 +382,22 @@
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data))); } catch (e) {}
   }
 
-  function doUpload() {
-    if (selectedIndex < 0) return;
-    var save = saves[selectedIndex];
-    if (save.hardcore) return;
+function doUpload() {
+  if (selectedIndex < 0) return;
+  var save = saves[selectedIndex];
+  if (save.hardcore) return;
 
-    var DATA = loadData();
-    if (!DATA || !Array.isArray(DATA.servers)) { location.href = 'realms.html'; return; }
-
-    var server = null;
-    for (var i = 0; i < DATA.servers.length; i++) {
-      if (DATA.servers[i].id === serverId) { server = DATA.servers[i]; break; }
-    }
-    if (!server) { location.href = 'realms.html'; return; }
-
-    var targetSlot = slotId;
-    if (!(targetSlot >= 1 && targetSlot <= 3)) targetSlot = server.activeSlot || 1;
-
-    if (!server.slots) server.slots = {};
-    server.slots[targetSlot] = server.slots[targetSlot] || {};
-
-    var s = server.slots[targetSlot];
-    s.empty = false;
-    s.name  = (save.name && save.name.trim()) ? save.name : ('World ' + targetSlot);
-    s.image = s.image || 'assets/background/panorama_0.png';
-    s.uploadedSaveId = save.id;
-
-    /* 清 minigame */
-    delete server.minigameTemplateId;
-    delete server.minigameName;
-    delete server.minigameImage;
-    delete server.minigameAuthor;
-    delete server.minigameVersion;
-    delete server.minigameRecommended;
-    if (server.worldType === 'MINIGAME') server.worldType = 'NORMAL';
-
-    saveData(DATA);
-
-    var url = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);
-    if (window.mcBack && typeof window.mcBack.back === 'function') {
-      window.mcBack.back(url);
-    } else {
-      location.href = url;
-    }
+  /* 跳上传进度页，回调里再写 localStorage */
+  var url = 'realms_upload.html?id=' + encodeURIComponent(serverId) +
+            '&slot=' + slotId +
+            '&name=' + encodeURIComponent((save.name && save.name.trim()) ? save.name : ('World ' + slotId)) +
+            '&save=' + encodeURIComponent(save.id);
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
   }
+}
 
   btnUp.addEventListener('click', function() {
     if (btnUp.disabled) return;
@@ -435,15 +407,14 @@
   /* ==========================================================
      Back
      ========================================================== */
-  function goBack() {
-    var url = 'realms_reset_world.html?id=' + encodeURIComponent(serverId) +
-              '&slot=' + encodeURIComponent(slotId);
-    if (window.mcBack && typeof window.mcBack.back === 'function') {
-      window.mcBack.back(url);
-    } else {
-      location.href = url;
-    }
+function goBack() {
+  if (window.mcBack && typeof window.mcBack.backTo === 'function') {
+    if (window.mcBack.backTo('realms_reset_world.html')) return;
   }
+  var url = 'realms_reset_world.html?id=' + encodeURIComponent(serverId) +
+            '&slot=' + slotId;
+  location.href = url;
+}
 
   btnBack.addEventListener('click', goBack);
 
