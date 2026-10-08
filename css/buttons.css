@@ -331,3 +331,34 @@
 .mcbtn-70:disabled {
   background-image: url('../assets/button/button_disabled_70.png');
 }
+/* ==========================================================
+   Realms Player 专用尺寸
+   ========================================================== */
+
+/* 160×20 —— Invite / Activity */
+.mcbtn-160 {
+  width: 160px;
+  height: 20px;
+  background-image: url('../assets/button/button_160.png');
+}
+.mcbtn-160:hover:not(:disabled),
+.mcbtn-160:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_160.png');
+}
+.mcbtn-160:disabled {
+  background-image: url('../assets/button/button_disabled_160.png');
+}
+
+/* 83×20 —— Back */
+.mcbtn-83 {
+  width: 83px;
+  height: 20px;
+  background-image: url('../assets/button/button_83.png');
+}
+.mcbtn-83:hover:not(:disabled),
+.mcbtn-83:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_83.png');
+}
+.mcbtn-83:disabled {
+  background-image: url('../assets/button/button_disabled_83.png');
+}

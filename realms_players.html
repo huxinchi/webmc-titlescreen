@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Configure Players</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/background/menu_list_background.png">
+<link rel="preload" as="image" href="assets/realms/op_icon.png">
+<link rel="preload" as="image" href="assets/realms/user_icon.png">
+<link rel="preload" as="image" href="assets/realms/cross_player_icon.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .rpp-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rpp-root > * { pointer-events: auto; }
+
+/* 列表下方暗带（y=216 到底部）
+   原版：bind 旧版 "options_background.png"（新版叫 menu_background.png）
+         × color(64,64,64) ≈ brightness(0.25) */
+.rpp-bottom-band {
+  position: absolute;
+  left: 0; right: 0;
+  top: 216px;
+  bottom: 0;
+  background-image: url('../assets/background/menu_background.png');
+  background-repeat: repeat;
+  background-size: 32px 32px;
+  image-rendering: pixelated;
+  filter: brightness(0.25);
+  pointer-events: none;
+  z-index: 0;
+}
+
+  /* 标题：居中，y=17 */
+  .rpp-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 17px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  /* Invited (N) 标签：x=50%-160, y=40 */
+  .rpp-invited-label {
+    position: absolute;
+    left: calc(50% - 160px);
+    top: 40px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  /* 列表：x=50%-160, y=53, 宽 160, 高 216-53=163 */
+  .rpp-list {
+    position: absolute;
+    left: calc(50% - 160px);
+    top: 53px;
+    width: 160px;
+    height: 163px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-image: url('assets/background/menu_list_background.png');
+    background-repeat: repeat;
+    background-size: 32px 32px;
+    image-rendering: pixelated;
+    box-sizing: border-box;
+  }
+
+  /* 条目 13 高 */
+  .rpp-entry {
+    position: relative;
+    width: 100%;
+    height: 13px;
+    cursor: default;
+    user-select: none;
+  }
+  .rpp-entry:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  /* 头像：8×8 at x+4, y+1 */
+  .rpp-face {
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 8px;
+    height: 8px;
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    background-color: #202020;
+  }
+
+  /* 名字：x+15 */
+  .rpp-name {
+    position: absolute;
+    left: 15px;
+    right: 24px;
+    top: 2px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+  }
+  .rpp-name[data-state="accepted-offline"] { color: #FFFFFF; }
+  .rpp-name[data-state="accepted-online"]  { color: #55FF55; }
+  .rpp-name[data-state="pending"]          { color: #AAAAAA; }
+
+  /* 图标 */
+  .rpp-icon-cross,
+  .rpp-icon-op,
+  .rpp-icon-user {
+    position: absolute;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    cursor: pointer;
+    z-index: 2;
+  }
+
+  /* X 图标：8×7，两帧 8×14，位于 x+128 */
+  .rpp-icon-cross {
+    left: 128px;
+    top: 2px;
+    width: 8px;
+    height: 7px;
+    background-image: url('assets/realms/cross_player_icon.png');
+    background-size: 8px 14px;
+    background-position: 0 0;
+  }
+  .rpp-icon-cross:hover {
+    background-position: 0 -7px;
+  }
+
+  /* OP 图标：8×8，两帧 8×16，位于 x+140 */
+  .rpp-icon-op {
+    left: 140px;
+    top: 1px;
+    width: 8px;
+    height: 8px;
+    background-image: url('assets/realms/op_icon.png');
+    background-size: 8px 16px;
+    background-position: 0 0;
+  }
+  .rpp-icon-op:hover {
+    background-position: 0 -8px;
+  }
+
+  /* user 图标：8×8，两帧 8×16，位于 x+140 */
+  .rpp-icon-user {
+    left: 140px;
+    top: 1px;
+    width: 8px;
+    height: 8px;
+    background-image: url('assets/realms/user_icon.png');
+    background-size: 8px 16px;
+    background-position: 0 0;
+  }
+  .rpp-icon-user:hover {
+    background-position: 0 -8px;
+  }
+
+  /* Invite 按钮：x=50%+12, y=53 */
+  .rpp-btn-invite {
+    position: absolute;
+    left: calc(50% + 12px);
+    top: 53px;
+  }
+
+  /* Activity 按钮：x=50%+12, y=79 */
+  .rpp-btn-activity {
+    position: absolute;
+    left: calc(50% + 12px);
+    top: 79px;
+  }
+
+  /* Activity feed 提示：x=50%+12, y=105 */
+  .rpp-activity-info {
+    position: absolute;
+    left: calc(50% + 12px);
+    top: 105px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  /* Back 按钮：x=50%+89, y=196 */
+  .rpp-btn-back {
+    position: absolute;
+    left: calc(50% + 89px);
+    top: 196px;
+  }
+
+  /* Tooltip */
+  .realms-tooltip {
+    position: fixed;
+    z-index: 9999;
+    max-width: 220px;
+    padding: 3px 5px;
+    background: rgba(0, 0, 0, 0.85);
+    color: #ffffff;
+    font-family: 'Minecraft', monospace;
+    font-size: 10px;
+    line-height: 1.3;
+    white-space: pre-line;
+    pointer-events: none;
+    display: none;
+    box-shadow: 0 0 0 1px #2c2c2c;
+  }
+  .realms-tooltip.visible { display: block; }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rpp-root">
+
+  <div class="rpp-bottom-band"></div>
+
+  <div class="rpp-title" id="rpp-title">Configure Players</div>
+
+  <div class="rpp-invited-label" id="rpp-invited-label">Invited (0)</div>
+
+  <div class="rpp-list mc-scroll" id="rpp-list"></div>
+
+  <button class="mcbtn mcbtn-160 rpp-btn-invite"   id="rpp-btn-invite">Invite Player</button>
+  <button class="mcbtn mcbtn-160 rpp-btn-activity" id="rpp-btn-activity" disabled>Player Activity</button>
+
+  <div class="rpp-activity-info" id="rpp-activity-info">Activity feed is not available in this version</div>
+
+  <button class="mcbtn mcbtn-83 rpp-btn-back" id="rpp-btn-back">Back</button>
+
+</div>
+
+<div class="realms-tooltip" id="rpp-tooltip"></div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var STORAGE_KEY = 'mc_realms';
+  var FN_KEY = '__fn__';
+
+  var params   = new URLSearchParams(location.search);
+  var serverId = params.get('id') || '';
+
+  /* ==========================================================
+     序列化 / 反序列化（与 realms.html 一致）
+     ========================================================== */
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) {}
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return deserialize(JSON.parse(raw));
+    } catch (e) { return null; }
+  }
+
+  function saveData(data) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data)));
+    } catch (e) {}
+  }
+
+  /* ==========================================================
+     数据
+     ========================================================== */
+  var DATA = loadData();
+  if (!DATA || !DATA.servers) {
+    location.href = 'realms.html';
+    return;
+  }
+
+  var server = null;
+  for (var i = 0; i < DATA.servers.length; i++) {
+    if (DATA.servers[i].id === serverId) { server = DATA.servers[i]; break; }
+  }
+
+  if (!server) {
+    location.href = 'realms.html';
+    return;
+  }
+
+  if (!Array.isArray(server.players)) server.players = [];
+
+  /* 兼容 DTO 字段名：RealmsServer 里 players 是 PlayerInfo[]，
+     每个含 name / uuid / operator / accepted / online */
+  function pName(p)     { return p.name || p.getName && p.getName() || ''; }
+  function pUuid(p)     { return p.uuid || p.getUuid && p.getUuid() || ''; }
+  function pOperator(p) { return !!(p.operator || p.isOperator && p.isOperator()); }
+  function pAccepted(p) { return !!(p.accepted || p.getAccepted && p.getAccepted()); }
+  function pOnline(p)   { return !!(p.online || p.getOnline && p.getOnline()); }
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var invitedLabelEl = document.getElementById('rpp-invited-label');
+  var listEl         = document.getElementById('rpp-list');
+  var btnInvite      = document.getElementById('rpp-btn-invite');
+  var btnActivity    = document.getElementById('rpp-btn-activity');
+  var btnBack        = document.getElementById('rpp-btn-back');
+  var tooltipEl      = document.getElementById('rpp-tooltip');
+
+  var TXT = {
+    invitedLabel:      'Invited (%d)',
+    activityDisabled:  'Activity feed is not available in this version',
+    removeTooltip:     'Remove player',
+    opTooltip:         'Operator',
+    userTooltip:       'Member',
+    inviteBtn:         'Invite Player',
+    activityBtn:       'Player Activity'
+  };
+
+  /* ==========================================================
+     渲染
+     ========================================================== */
+  function render() {
+    invitedLabelEl.textContent = TXT.invitedLabel.replace('%d', server.players.length);
+
+    listEl.innerHTML = '';
+    for (var i = 0; i < server.players.length; i++) {
+      listEl.appendChild(renderEntry(server.players[i], i));
+    }
+  }
+
+  function renderEntry(player, index) {
+    var el = document.createElement('div');
+    el.className = 'rpp-entry';
+
+    /* 头像 8×8 */
+    var face = document.createElement('div');
+    face.className = 'rpp-face';
+    var uuid = pUuid(player);
+    if (uuid) {
+      /* crafatar 头像 API；加载失败保持 #202020 底色 */
+      face.style.backgroundImage = 'url("https://crafatar.com/avatars/' +
+        encodeURIComponent(uuid) + '?size=8&overlay")';
+    }
+    el.appendChild(face);
+
+    /* 名字 */
+    var name = document.createElement('div');
+    name.className = 'rpp-name';
+    var st;
+    if (!pAccepted(player))        st = 'pending';
+    else if (pOnline(player))      st = 'accepted-online';
+    else                            st = 'accepted-offline';
+    name.dataset.state = st;
+    name.textContent = pName(player);
+    el.appendChild(name);
+
+    /* 移除图标 */
+    var cross = document.createElement('div');
+    cross.className = 'rpp-icon-cross';
+    cross.addEventListener('click', function(e) {
+      e.stopPropagation();
+      uninvite(index);
+    });
+    cross.addEventListener('mouseenter', function() { showTooltip(TXT.removeTooltip); });
+    cross.addEventListener('mouseleave', hideTooltip);
+    el.appendChild(cross);
+
+    /* OP / user 图标 */
+    var isOp = pOperator(player);
+    var icon = document.createElement('div');
+    icon.className = isOp ? 'rpp-icon-op' : 'rpp-icon-user';
+    icon.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleOp(index);
+    });
+    icon.addEventListener('mouseenter', function() {
+      showTooltip(isOp ? TXT.opTooltip : TXT.userTooltip);
+    });
+    icon.addEventListener('mouseleave', hideTooltip);
+    el.appendChild(icon);
+
+    return el;
+  }
+
+  /* ==========================================================
+     op / deop
+     ========================================================== */
+  function toggleOp(index) {
+    var p = server.players[index];
+    if (!p) return;
+    p.operator = !pOperator(p);
+    saveData(DATA);
+    render();
+  }
+
+  /* ==========================================================
+     uninvite（弹确认框）
+     ========================================================== */
+  function uninvite(index) {
+    var p = server.players[index];
+    if (!p) return;
+
+    var nm = pName(p);
+
+    window.mcDialog.confirm({
+      title:   'Question',
+      message: "Are you sure you want to uninvite '" + nm + "'?",
+      onYes: function() {
+        server.players.splice(index, 1);
+        saveData(DATA);
+        render();
+      }
+    });
+  }
+
+  /* ==========================================================
+     Tooltip
+     ========================================================== */
+  function showTooltip(text) {
+    tooltipEl.textContent = text;
+    tooltipEl.classList.add('visible');
+  }
+  function hideTooltip() { tooltipEl.classList.remove('visible'); }
+
+  document.addEventListener('mousemove', function(e) {
+    if (!tooltipEl.classList.contains('visible')) return;
+    var x = e.clientX + 12;
+    var y = e.clientY + 8;
+    var w = tooltipEl.offsetWidth;
+    if (x + w > window.innerWidth - 4) x = e.clientX - w - 12;
+    tooltipEl.style.left = x + 'px';
+    tooltipEl.style.top  = y + 'px';
+  });
+
+  /* ==========================================================
+     按钮
+     ========================================================== */
+  btnInvite.addEventListener('click', function() {
+    window.mcDialog.alert({
+      title:   'Invite Player',
+      message: 'Inviting players is not available yet.'
+    });
+  });
+
+  btnBack.addEventListener('click', function() {
+    var url = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);
+    location.href = url;   /* 用 location.href 避免压栈，让栈顶仍是 configure */
+  });
+
+  /* ==========================================================
+     Esc
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      btnBack.click();
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  render();
+
+})();
+</script>
+
+</body>
+</html>

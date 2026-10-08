@@ -658,8 +658,13 @@ btnBack.style.left = 'calc(50% + 118px)';
      底部按钮
      ========================================================== */
   btnPlayers.addEventListener('click', function() {
-    placeholder('Players');
-  });
+  var url = 'realms_players.html?id=' + encodeURIComponent(serverId);
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+});
   btnSettings.addEventListener('click', function() {
     placeholder('Settings');
   });
