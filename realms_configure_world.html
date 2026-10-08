@@ -674,10 +674,17 @@ btnBack.style.left = 'calc(50% + 118px)';
   btnSettings.addEventListener('click', function() {
     placeholder('Settings');
   });
-  btnSubscription.addEventListener('click', function() {
-    placeholder('Subscription');
-  });
 
+
+// 改成
+btnSubscription.addEventListener('click', function() {
+  var url = 'realms_subscription.html?id=' + encodeURIComponent(serverId);
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;   // 兜底
+  }
+});
 
 // 改成
 btnOptions.addEventListener('click', function() {

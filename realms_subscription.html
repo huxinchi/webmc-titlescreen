@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Subscription</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .rsi-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rsi-root > * { pointer-events: auto; }
+
+  /* Title —— drawCenteredString(width/2, 17) */
+  .rsi-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 17px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  /* 标签 —— drawString(w/2-100, row(i), 0xA0A0A0) */
+  .rsi-label {
+    position: absolute;
+    left: calc(50% - 100px);
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .rsi-label-start { top: 10px; }   /* row(0) */
+  .rsi-label-time  { top: 70px; }   /* row(3) */
+
+  /* 值 —— drawString(w/2-100, row(i), 0xFFFFFF) */
+  .rsi-value {
+    position: absolute;
+    left: calc(50% - 100px);
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .rsi-value-start { top: 30px; }   /* row(1) */
+  .rsi-value-time  { top: 90px; }   /* row(4) */
+
+  /* 按钮：宽 200，水平居中 —— row(6)/row(10)/row(12) */
+  .rsi-btn {
+    position: absolute;
+    left: calc(50% - 100px);
+  }
+  .rsi-btn-extend { top: 130px; }   /* row(6)  */
+  .rsi-btn-delete { top: 210px; }   /* row(10) */
+  .rsi-btn-back   { top: 250px; }   /* row(12) */
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rsi-root" id="rsi-root">
+
+  <div class="rsi-title" id="rsi-title">Subscription</div>
+
+  <div class="rsi-label rsi-label-start" id="rsi-label-start">Start date:</div>
+  <div class="rsi-value rsi-value-start" id="rsi-value-start"></div>
+
+  <div class="rsi-label rsi-label-time"  id="rsi-label-time">Time left:</div>
+  <div class="rsi-value rsi-value-time"  id="rsi-value-time"></div>
+
+  <button class="mcbtn mcbtn-long rsi-btn rsi-btn-extend" id="btn-extend" type="button">Extend</button>
+  <button class="mcbtn mcbtn-long rsi-btn rsi-btn-delete" id="btn-delete" type="button" style="display:none">Delete</button>
+  <button class="mcbtn mcbtn-long rsi-btn rsi-btn-back"   id="btn-back"   type="button">Back</button>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     参数
+     ========================================================== */
+  var params   = new URLSearchParams(location.search);
+  var serverId = params.get('id') || '';
+
+  if (!serverId) {
+    try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+    catch (e) {}
+  }
+  if (serverId) {
+    try { localStorage.setItem('mc_realms_server_id', serverId); }
+    catch (e) {}
+  }
+
+  /* ==========================================================
+     文案
+     ========================================================== */
+  var TXT = {
+    title:            'Subscription',
+    startLabel:       'Start date:',
+    timeLeftNormal:   'Time left:',
+    timeLeftRecurring:'Recurring time left:',
+    extend:           'Extend',
+    del:              'Delete',
+    back:             'Back',
+    expired:          'Expired',
+    lessThanADay:     'Less than a day',
+    month:            'month',
+    months:           'months',
+    day:              'day',
+    days:             'days',
+    deleteLine1:      "Deleting a Realm is permanent and can't be undone. Continue?",
+    deleteLine2:      'All worlds and backups will be lost.'
+  };
+
+  var PURCHASE_LINK = 'https://account.mojang.com/buy/realms';
+
+  /* ==========================================================
+     序列化 / 反序列化（与 realms.html 一致）
+     ========================================================== */
+  var STORAGE_KEY = 'mc_realms';
+  var FN_KEY = '__fn__';
+
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) {}
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return deserialize(JSON.parse(raw));
+    } catch (e) { return null; }
+  }
+
+  function saveData(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data))); } catch (e) {}
+  }
+
+  /* ==========================================================
+     数据
+     ========================================================== */
+  var DATA = loadData();
+  if (!DATA || !Array.isArray(DATA.servers)) {
+    location.href = 'realms.html';
+    return;
+  }
+
+  var server = null;
+  for (var i = 0; i < DATA.servers.length; i++) {
+    if (DATA.servers[i].id === serverId) { server = DATA.servers[i]; break; }
+  }
+  if (!server) {
+    location.href = 'realms.html';
+    return;
+  }
+
+  /* ==========================================================
+     订阅数据
+     优先：server.subscription 对象
+     回退：由 server.daysLeft / server.expired 派生
+     ========================================================== */
+  function resolveSubscription() {
+    var sub = server.subscription || {};
+
+    var daysLeft;
+    if (sub.daysLeft != null) {
+      daysLeft = sub.daysLeft;
+    } else if (server.expired) {
+      daysLeft = -1;
+    } else if (server.daysLeft != null) {
+      daysLeft = server.daysLeft;
+    } else {
+      daysLeft = 0;
+    }
+
+    /* startDate 毫秒时间戳；没有就从「现在 - 已过天数」推 */
+    var startDate = sub.startDate;
+    if (startDate == null) {
+      var elapsedMs = (daysLeft > 0 ? 30 - daysLeft : 30) * 24 * 60 * 60 * 1000;
+      startDate = Date.now() - Math.max(0, elapsedMs);
+    }
+
+    /* NORMAL / RECURRING；没有就按是否过期猜 */
+    var type = sub.type || (server.expired ? 'NORMAL' : 'RECURRING');
+
+    return {
+      daysLeft:              daysLeft,
+      startDate:             startDate,
+      type:                  type,
+      remoteSubscriptionId:  sub.remoteSubscriptionId || server.remoteSubscriptionId || ''
+    };
+  }
+
+  var SUB = resolveSubscription();
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var titleEl        = document.getElementById('rsi-title');
+  var labelStartEl   = document.getElementById('rsi-label-start');
+  var labelTimeEl    = document.getElementById('rsi-label-time');
+  var valueStartEl   = document.getElementById('rsi-value-start');
+  var valueTimeEl    = document.getElementById('rsi-value-time');
+  var btnExtend      = document.getElementById('btn-extend');
+  var btnDelete      = document.getElementById('btn-delete');
+  var btnBack        = document.getElementById('btn-back');
+
+  titleEl.textContent      = TXT.title;
+  labelStartEl.textContent = TXT.startLabel;
+  btnExtend.textContent    = TXT.extend;
+  btnDelete.textContent    = TXT.del;
+  btnBack.textContent      = TXT.back;
+
+  /* ==========================================================
+     开始日期 —— localPresentation()
+     使用浏览器区域设置，与 Java 的 DateFormat.getDateTimeInstance() 一致
+     ========================================================== */
+  function localPresentation(ms) {
+    try {
+      return new Date(ms).toLocaleString();
+    } catch (e) {
+      return String(ms);
+    }
+  }
+
+  valueStartEl.textContent = localPresentation(SUB.startDate);
+
+  /* ==========================================================
+     剩余时间 —— daysLeftPresentation()
+     ========================================================== */
+  function daysLeftPresentation(daysLeft) {
+    if (daysLeft === -1 && server.expired) {
+      return TXT.expired;
+    }
+    if (daysLeft <= 1) {
+      return TXT.lessThanADay;
+    }
+
+    var months = Math.floor(daysLeft / 30);
+    var days   = daysLeft % 30;
+    var parts  = [];
+
+    if (months > 0) {
+      parts.push(months + ' ' + (months === 1 ? TXT.month : TXT.months));
+    }
+    if (days > 0) {
+      parts.push(days + ' ' + (days === 1 ? TXT.day : TXT.days));
+    }
+
+    return parts.join(', ');
+  }
+
+  /* 标签文案（NORMAL / RECURRING） */
+  labelTimeEl.textContent =
+    (SUB.type === 'RECURRING') ? TXT.timeLeftRecurring : TXT.timeLeftNormal;
+
+  valueTimeEl.textContent = daysLeftPresentation(SUB.daysLeft);
+
+  /* ==========================================================
+     Delete 按钮可见性
+     Java: if (this.serverData.expired) → 才显示
+     ========================================================== */
+  if (server.expired) {
+    btnDelete.style.display = '';
+  } else {
+    btnDelete.style.display = 'none';
+  }
+
+  /* ==========================================================
+     Extend
+     Java: 复制到剪贴板 + browseTo(extensionUrl)
+     ========================================================== */
+  btnExtend.addEventListener('click', function() {
+    var uuid = DATA.ownUUID || '';
+    var sid  = SUB.remoteSubscriptionId || '';
+
+    var url = PURCHASE_LINK +
+              '?sid=' + encodeURIComponent(sid) +
+              '&pid=' + encodeURIComponent(uuid);
+
+    /* 剪贴板（失败不阻塞跳转） */
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).catch(function() {});
+      }
+    } catch (e) {}
+
+    /* 打开外链，用 noback 语义（不压栈） */
+    window.open(url, '_blank', 'noopener');
+  });
+
+  /* ==========================================================
+     Delete —— 弹 long_confirm（id=1，warning 类型）
+     ========================================================== */
+  btnDelete.addEventListener('click', function() {
+    try {
+      localStorage.setItem('mc_realms_long_confirm', JSON.stringify({
+        type:  'warning',
+        line2: TXT.deleteLine1,
+        line3: TXT.deleteLine2,
+        mode:  'yesno',
+        id:    1,
+        back:  'realms_subscription.html?id=' + encodeURIComponent(serverId)
+      }));
+    } catch (e) {}
+
+    var url = 'realms_long_confirm.html';
+    if (window.mcBack && typeof window.mcBack.jumpNoPush === 'function') {
+      window.mcBack.jumpNoPush(url);
+    } else {
+      location.href = url;   /* 兜底 */
+    }
+  });
+
+  /* ==========================================================
+     处理从 long_confirm 返回的结果
+     id=1 → 删除 Realm 并回 realms.html
+     ========================================================== */
+  (function handleLongConfirmResult() {
+    var raw = null;
+    try {
+      raw = localStorage.getItem('mc_realms_long_confirm_result');
+      if (raw) localStorage.removeItem('mc_realms_long_confirm_result');
+    } catch (e) { return; }
+    if (!raw) return;
+
+    var res;
+    try { res = JSON.parse(raw); } catch (e) { return; }
+    if (!res || res.id !== 1) return;
+
+    if (res.result === true) {
+      /* 从 DATA.servers 中移除 */
+      for (var i = 0; i < DATA.servers.length; i++) {
+        if (DATA.servers[i].id === serverId) {
+          DATA.servers.splice(i, 1);
+          break;
+        }
+      }
+      saveData(DATA);
+
+      /* 清掉 serverId，避免其它页面残留 */
+      try { localStorage.removeItem('mc_realms_server_id'); } catch (e) {}
+
+      /* 回主列表（栈里的所有页面都要跳过） */
+      var url = 'realms.html';
+      if (window.mcBack && typeof window.mcBack.back === 'function') {
+        /* 直接跳，不走栈 —— 因为 Realm 已删，中间页都无效了 */
+        location.href = url;
+      } else {
+        location.href = url;
+      }
+    }
+  })();
+
+  /* ==========================================================
+     Back —— mcBack.back，fallback → configure_world
+     ========================================================== */
+  function goBack() {
+    var url = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;   /* 兜底 */
+    }
+  }
+
+  btnBack.addEventListener('click', function(e) {
+    e.preventDefault();
+    goBack();
+  });
+
+  /* ==========================================================
+     Esc → Back
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    goBack();
+  }, true);
+
+})();
+</script>
+
+</body>
+</html>
