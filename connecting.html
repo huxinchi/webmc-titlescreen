@@ -346,9 +346,6 @@ function abortWithError(err) {
   }
 }
 
-  /* ==========================================================
-     结束 —— 调 onJoin
-     ========================================================== */
 function finish() {
   if (aborted) return;
 
@@ -359,33 +356,19 @@ function finish() {
     return;
   }
 
-  /* 记住"待执行的 join"，world_loading 结束后回 multiplayer 执行 */
+  /* 多人进服务器：连接成功后直接调 onJoin
+     （原版这里进游戏 + LoadingOverlay，网页版对应 onJoin 的 alert / 跳转） */
   try {
-    localStorage.setItem('mc_pending_join', JSON.stringify({
-      type: 'server',
-      id:   id   || '',
-      addr: addr || ''
-    }));
+    target.onJoin.call(target);
   } catch (e) {
-    /* 兜底：直接走 handle */
-    try { target.onJoin.call(target); } catch (err) {}
-    setTimeout(function() { if (!aborted) goBack(); }, 500);
-    return;
+    console.error('[connecting] onJoin', e);
   }
 
-  /* 跳 world_loading 做地形加载 —— jumpNoPush 不把 connecting 压栈 */
-  var qs = [];
-  if (id)   qs.push('sid='    + encodeURIComponent(id));
-  if (addr) qs.push('addr='   + encodeURIComponent(addr));
-  qs.push('return=' + encodeURIComponent('multiplayer.html'));
-
-  var url = 'world_loading.html?' + qs.join('&');
-
-  if (window.mcBack && typeof window.mcBack.jumpNoPush === 'function') {
-    window.mcBack.jumpNoPush(url);
-  } else {
-    location.href = url;
-  }
+  /* onJoin 一般会弹 alert 或跳走；
+     如果它什么都没做，500ms 后自动回 multiplayer */
+  setTimeout(function() {
+    if (!aborted) goBack();
+  }, 500);
 }
   /* ==========================================================
      取消 / 回落
