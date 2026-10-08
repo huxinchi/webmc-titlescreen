@@ -43,7 +43,6 @@
   }
   .rus-root > * { pointer-events: auto; }
 
-  /* Title @ (w/2, 13) */
   .rus-title {
     position: absolute;
     left: 50%; transform: translateX(-50%);
@@ -56,12 +55,6 @@
     pointer-events: none;
   }
 
-  /* 副标题 @ row(-1) —— Java 就是负的（屏幕外），不显示，只保留元素 */
-  .rus-subtitle {
-    display: none;
-  }
-
-  /* 列表：row(0)=10 → h-40 */
   .rus-list-wrap {
     position: absolute;
     left: 0; right: 0;
@@ -113,7 +106,6 @@
     color: #AA0000;
   }
 
-  /* 空状态 */
   .rus-empty {
     position: absolute;
     left: 0; right: 0;
@@ -129,7 +121,6 @@
   }
   .rus-empty.visible { display: block; }
 
-  /* 底部按钮 */
   .rus-btn {
     position: absolute;
     bottom: 12px;
@@ -151,7 +142,6 @@
 <div class="rus-root" id="rus-root">
 
   <div class="rus-title">Select World to Upload</div>
-  <div class="rus-subtitle"></div>
 
   <div class="rus-list-wrap mc-scroll" id="rus-list-wrap">
     <div class="rus-list" id="rus-list"></div>
@@ -185,6 +175,7 @@
   }
 
   var slotId = parseInt(slotParam, 10);
+  if (!(slotId >= 1 && slotId <= 3)) slotId = 0;
 
   /* ==========================================================
      文案
@@ -202,28 +193,73 @@
   };
 
   /* ==========================================================
-     本地存档数据
-     优先从 localStorage.mc_saves 读；否则用 mock
+     从单机存档 mc_worlds 加载
      ========================================================== */
-  function loadSaves() {
-    try {
-      var raw = localStorage.getItem('mc_saves');
-      if (raw) {
-        var arr = JSON.parse(raw);
-        if (Array.isArray(arr)) return arr;
-      }
-    } catch (e) {}
-    return generateMockSaves();
+  var WORLDS_KEY = 'mc_worlds';
+
+  function parseLastPlayed(str) {
+    if (!str) return Date.now();
+    /* 'YYYY/MM/DD HH:MM' */
+    var m = /^(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})$/.exec(String(str));
+    if (m) {
+      return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).getTime();
+    }
+    var d = new Date(str);
+    if (!isNaN(d.getTime())) return d.getTime();
+    return Date.now();
   }
 
-  function generateMockSaves() {
-    var now = Date.now();
-    return [
-      { id: 'survival_1', name: 'My Survival World', lastPlayed: now - 86400000,        gameMode: 0, hardcore: false, cheats: true  },
-      { id: 'creative_1', name: 'Creative Build',    lastPlayed: now - 3600000 * 4,     gameMode: 1, hardcore: false, cheats: false },
-      { id: 'old_1',      name: 'Old World',         lastPlayed: now - 86400000 * 30,   gameMode: 0, hardcore: true,  cheats: false, requiresConversion: true },
-      { id: 'adv_1',      name: '',                  lastPlayed: now - 86400000 * 3,    gameMode: 2, hardcore: false, cheats: false }
-    ];
+  function inferGameMode(world) {
+    if (typeof world.gameMode === 'number' && world.gameMode >= 0 && world.gameMode <= 3) {
+      return world.gameMode;
+    }
+    var info = String(world.info || '').toLowerCase();
+    if (info.indexOf('creative')   >= 0) return 1;
+    if (info.indexOf('adventure')  >= 0) return 2;
+    if (info.indexOf('spectator')  >= 0) return 3;
+    return 0;
+  }
+
+  function inferHardcore(world) {
+    if (typeof world.hardcore === 'boolean') return world.hardcore;
+    return String(world.info || '').toLowerCase().indexOf('hardcore') >= 0;
+  }
+
+  function inferCheats(world) {
+    if (typeof world.cheats === 'boolean') return world.cheats;
+    return String(world.info || '').toLowerCase().indexOf('cheat') >= 0;
+  }
+
+  function inferConversion(world) {
+    if (typeof world.requiresConversion === 'boolean') return world.requiresConversion;
+    return String(world.info || '').toLowerCase().indexOf('conversion') >= 0;
+  }
+
+  function loadSaves() {
+    var list = [];
+    try {
+      var raw = localStorage.getItem(WORLDS_KEY);
+      if (raw) {
+        var arr = JSON.parse(raw);
+        if (Array.isArray(arr)) list = arr;
+      }
+    } catch (e) {}
+
+    var result = [];
+    for (var i = 0; i < list.length; i++) {
+      var w = list[i];
+      if (!w || typeof w !== 'object') continue;
+      result.push({
+        id:                 w.folder || '',
+        name:               w.name || '',
+        lastPlayed:         parseLastPlayed(w.lastPlayed),
+        gameMode:           inferGameMode(w),
+        hardcore:           inferHardcore(w),
+        cheats:             inferCheats(w),
+        requiresConversion: inferConversion(w)
+      });
+    }
+    return result;
   }
 
   var saves = loadSaves();
@@ -253,7 +289,6 @@
       items[i].classList.toggle('selected', i === idx);
     }
 
-    /* Upload 按钮：选中 + 非 hardcore 才可点 */
     var ok = (idx >= 0 && !saves[idx].hardcore);
     btnUp.disabled = !ok;
   }
@@ -289,20 +324,17 @@
     el.className = 'rus-item';
     el.dataset.index = String(index);
 
-    /* 名字（空的话用 "World N" 兜底） */
     var nameText = save.name && save.name.trim() ? save.name : (TXT.worldPrefix + ' ' + (index + 1));
     var nameEl = document.createElement('div');
     nameEl.className = 'rus-item-name';
     nameEl.textContent = nameText;
     el.appendChild(nameEl);
 
-    /* id + 日期 */
     var idEl = document.createElement('div');
     idEl.className = 'rus-item-id';
     idEl.textContent = (save.id || '') + ' (' + formatDate(save.lastPlayed) + ')';
     el.appendChild(idEl);
 
-    /* 信息行 */
     var infoEl = document.createElement('div');
     infoEl.className = 'rus-item-info';
 
@@ -328,76 +360,25 @@
   }
 
   /* ==========================================================
-     Upload —— 写回 server.slots[slotId]
-     （真实流程走文件上传，网页版模拟为立即完成）
+     Upload —— 跳进度页
      ========================================================== */
-  var STORAGE_KEY = 'mc_realms';
-  var FN_KEY = '__fn__';
+  function doUpload() {
+    if (selectedIndex < 0) return;
+    var save = saves[selectedIndex];
+    if (save.hardcore) return;
 
-  function serialize(obj) {
-    if (Array.isArray(obj)) return obj.map(serialize);
-    if (!obj || typeof obj !== 'object') return obj;
-    var out = {};
-    for (var k in obj) {
-      if (k.charAt(0) === '_') continue;
-      var v = obj[k];
-      if (typeof v === 'function') {
-        out[k] = {}; out[k][FN_KEY] = v.toString();
-      } else if (v && typeof v === 'object') {
-        out[k] = serialize(v);
-      } else {
-        out[k] = v;
-      }
+    var worldName = (save.name && save.name.trim()) ? save.name : ('World ' + (selectedIndex + 1));
+
+    var url = 'realms_upload.html?id=' + encodeURIComponent(serverId) +
+              '&slot=' + (slotId || '') +
+              '&name=' + encodeURIComponent(worldName) +
+              '&save=' + encodeURIComponent(save.id);
+    if (window.mcBack && typeof window.mcBack.jump === 'function') {
+      window.mcBack.jump(url);
+    } else {
+      location.href = url;
     }
-    return out;
   }
-
-  function deserialize(obj) {
-    if (Array.isArray(obj)) return obj.map(deserialize);
-    if (!obj || typeof obj !== 'object') return obj;
-    var out = {};
-    for (var k in obj) {
-      var v = obj[k];
-      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
-        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
-        catch (e) {}
-      } else if (v && typeof v === 'object') {
-        out[k] = deserialize(v);
-      } else {
-        out[k] = v;
-      }
-    }
-    return out;
-  }
-
-  function loadData() {
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      return deserialize(JSON.parse(raw));
-    } catch (e) { return null; }
-  }
-
-  function saveData(data) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data))); } catch (e) {}
-  }
-
-function doUpload() {
-  if (selectedIndex < 0) return;
-  var save = saves[selectedIndex];
-  if (save.hardcore) return;
-
-  /* 跳上传进度页，回调里再写 localStorage */
-  var url = 'realms_upload.html?id=' + encodeURIComponent(serverId) +
-            '&slot=' + slotId +
-            '&name=' + encodeURIComponent((save.name && save.name.trim()) ? save.name : ('World ' + slotId)) +
-            '&save=' + encodeURIComponent(save.id);
-  if (window.mcBack && typeof window.mcBack.jump === 'function') {
-    window.mcBack.jump(url);
-  } else {
-    location.href = url;
-  }
-}
 
   btnUp.addEventListener('click', function() {
     if (btnUp.disabled) return;
@@ -407,14 +388,15 @@ function doUpload() {
   /* ==========================================================
      Back
      ========================================================== */
-function goBack() {
-  if (window.mcBack && typeof window.mcBack.backTo === 'function') {
-    if (window.mcBack.backTo('realms_reset_world.html')) return;
+  function goBack() {
+    var url = 'realms_reset_world.html?id=' + encodeURIComponent(serverId) +
+              '&slot=' + (slotId || '');
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;
+    }
   }
-  var url = 'realms_reset_world.html?id=' + encodeURIComponent(serverId) +
-            '&slot=' + slotId;
-  location.href = url;
-}
 
   btnBack.addEventListener('click', goBack);
 

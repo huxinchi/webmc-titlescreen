@@ -1001,7 +1001,6 @@ popupBtnsEl.appendChild(btnBuy);
 /* Play 按钮 / 双击 → 跳加载页，由 realms_connecting.html 走完后调 onJoin */
 function fireJoin(server) {
   if (!server) return;
-  if (typeof server.onJoin !== 'function') return;
 
   var url = 'realms_connecting.html?id=' + encodeURIComponent(server.id || '');
   if (window.mcBack && typeof window.mcBack.jump === 'function') {

@@ -288,16 +288,18 @@
   var mainTimer = null;
 
   function finish() {
-    if (aborted) return;
-    aborted = true;
-    stopAnim();
+  if (aborted) return;
+  aborted = true;
+  stopAnim();
 
-    var server = findRealmServer(serverId);
-    if (!server || typeof server.onJoin !== 'function') {
-      showError('Could not join the Realm');
-      return;
-    }
+  var server = findRealmServer(serverId);
+  if (!server) {
+    showError('Could not join the Realm');
+    return;
+  }
 
+  /* 有 onJoin 就调；没有就当作正常完成 */
+  if (typeof server.onJoin === 'function') {
     try {
       server.onJoin.call(server);
     } catch (e) {
@@ -305,10 +307,10 @@
       showError(String(e && e.message || e));
       return;
     }
-
-    /* onJoin 完成后，延迟一小会儿回 realms.html */
-    setTimeout(goBack, 500);
   }
+
+  setTimeout(goBack, 500);
+}
 
   function showError(msg) {
     aborted = true;

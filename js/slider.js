@@ -28,13 +28,17 @@
       handle.style.left = (ratio * trackW) + 'px';
     }
 
-    function valueFromX(clientX) {
-      var rect = el.getBoundingClientRect();
-      var relX = clientX - rect.left - handle.offsetWidth / 2;
-      var trackW = el.clientWidth - handle.offsetWidth;
-      var ratio = trackW > 0 ? Math.max(0, Math.min(1, relX / trackW)) : 0;
-      return min + ratio * (max - min);
-    }
+function valueFromX(clientX) {
+  var rect = el.getBoundingClientRect();
+  var handleRect = handle.getBoundingClientRect();
+
+  var handleW = handleRect.width;          // 屏幕像素
+  var trackW = rect.width - handleW;       // 屏幕像素
+  var relX = clientX - rect.left - handleW / 2;
+
+  var ratio = trackW > 0 ? Math.max(0, Math.min(1, relX / trackW)) : 0;
+  return min + ratio * (max - min);
+}
 
     function setValue(v, fireEvent) {
       v = snap(v);

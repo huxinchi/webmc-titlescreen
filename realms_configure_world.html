@@ -640,18 +640,14 @@ function onSlotClick(slotId, isEmpty, isActiveSlot) {
     if (server.expired) return;
     if (server.state !== 'open' && server.state !== 'closed') return;
 
-    if (server.state === 'open') {
-      /* 直接 Play */
-      if (typeof server.onJoin === 'function') {
-        try { server.onJoin.call(server); return; } catch (e) {}
-      }
-      var url = 'realms_connecting.html?id=' + encodeURIComponent(server.id);
-      if (window.mcBack && typeof window.mcBack.jump === 'function') {
-        window.mcBack.jump(url);
-      } else {
-        location.href = url;
-      }
-    } else if (server.state === 'closed') {
+   if (server.state === 'open') {
+  var url = 'realms_connecting.html?id=' + encodeURIComponent(server.id);
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+} else if (server.state === 'closed') {
       /* 打开世界（原版 openTheWorld） */
       window.mcDialog.alert({
         title: 'Open Realm',
