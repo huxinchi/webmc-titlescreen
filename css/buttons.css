@@ -456,3 +456,34 @@
 .mcbtn-205:disabled {
   background-image: url('../assets/button/button_disabled_205.png');
 }
+/* ==========================================================
+   Realms Backup 专用尺寸
+   ========================================================== */
+
+/* 120×20 —— Download */
+.mcbtn-120 {
+  width: 120px;
+  height: 20px;
+  background-image: url('../assets/button/button_120.png');
+}
+.mcbtn-120:hover:not(:disabled),
+.mcbtn-120:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_120.png');
+}
+.mcbtn-120:disabled {
+  background-image: url('../assets/button/button_disabled_120.png');
+}
+
+/* 85×20 —— Back */
+.mcbtn-85 {
+  width: 85px;
+  height: 20px;
+  background-image: url('../assets/button/button_85.png');
+}
+.mcbtn-85:hover:not(:disabled),
+.mcbtn-85:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_85.png');
+}
+.mcbtn-85:disabled {
+  background-image: url('../assets/button/button_disabled_85.png');
+}

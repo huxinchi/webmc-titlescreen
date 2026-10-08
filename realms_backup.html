@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Backups</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/realms/restore_icon.png">
+<link rel="preload" as="image" href="assets/realms/plus_icon.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .rbk-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rbk-root > * { pointer-events: auto; }
+
+  /* Title @ (w/2, 12) */
+  .rbk-title {
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    top: 12px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none; white-space: nowrap;
+    pointer-events: none;
+  }
+  /* 副标签 @ ((w-150)/2 - 90, 20)，色 0xA0A0A0 */
+  .rbk-sublabel {
+    position: absolute;
+    top: 20px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    user-select: none; white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* 列表：占满屏幕宽度，顶 32 → 底 h-15 */
+  .rbk-list-wrap {
+    position: absolute;
+    left: 0; right: 0;
+    top: 32px;
+    bottom: 15px;
+    overflow-y: auto; overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  .rbk-list { width: 100%; }
+
+  .rbk-item {
+    position: relative;
+    height: 36px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0;
+    cursor: default;
+    user-select: none;
+  }
+
+  .rbk-item-name {
+    position: absolute;
+    left: 18px; top: 1px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #FFFFFF;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .rbk-item-name.uploaded { color: #7FFFFF; }
+
+  .rbk-item-date {
+    position: absolute;
+    left: 18px; top: 12px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #4C4C8C;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* restore icon：12×14，右端 30px */
+  .rbk-icon-restore {
+    position: absolute;
+    right: 30px;
+    top: 8px;
+    width: 12px;
+    height: 14px;
+    background-image: url('assets/realms/restore_icon.png');
+    background-size: 12px 28px;      /* 原 23×56 等比缩到 12×28，两帧 */
+    background-position: 0 0;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    cursor: pointer;
+  }
+  .rbk-icon-restore:hover {
+    background-position: 0 -14px;
+  }
+
+  /* info icon：8×8，右端 40px */
+  .rbk-icon-info {
+    position: absolute;
+    right: 40px;
+    top: 14px;
+    width: 8px;
+    height: 8px;
+    background-image: url('assets/realms/plus_icon.png');
+    background-size: 8px 16px;       /* 原 15×30 等比缩到 8×16，两帧 */
+    background-position: 0 0;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    cursor: pointer;
+  }
+  .rbk-icon-info:hover {
+    background-position: 0 -8px;
+  }
+
+  /* 空状态：Java 在 (20, h/2 - 10) */
+  .rbk-empty {
+    position: absolute;
+    left: 20px;
+    top: calc(50% - 10px);
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none; white-space: nowrap;
+    pointer-events: none;
+    display: none;
+  }
+  .rbk-empty.visible { display: block; }
+
+  /* Download 按钮：右下 (w-135, 32) 120×20 */
+  .rbk-btn-download {
+    position: absolute;
+    right: 135px;
+    top: 32px;
+  }
+
+  /* Back 按钮：右下 (w-100, h-35) 85×20 */
+  .rbk-btn-back {
+    position: absolute;
+    right: 15px;
+    bottom: 15px;
+  }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rbk-root" id="rbk-root">
+
+  <div class="rbk-title" id="rbk-title">Backups</div>
+  <div class="rbk-sublabel" id="rbk-sublabel">Backups</div>
+
+  <div class="rbk-list-wrap mc-scroll" id="rbk-list-wrap">
+    <div class="rbk-list" id="rbk-list"></div>
+  </div>
+
+  <div class="rbk-empty" id="rbk-empty">No backups found!</div>
+
+  <button class="mcbtn mcbtn-120 rbk-btn-download" id="btn-download" type="button">Download</button>
+  <button class="mcbtn mcbtn-85  rbk-btn-back"     id="btn-back"     type="button">Back</button>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     参数
+     ========================================================== */
+  var params   = new URLSearchParams(location.search);
+  var serverId = params.get('id') || '';
+  var slotParam = params.get('slot') || '';
+
+  if (!serverId) {
+    try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+    catch (e) {}
+  }
+  if (serverId) {
+    try { localStorage.setItem('mc_realms_server_id', serverId); }
+    catch (e) {}
+  }
+
+  /* ==========================================================
+     文案（Realms 无 i18n）
+     ========================================================== */
+  var TXT = {
+    title:        'Backups',
+    sublabel:     'Backups',
+    download:     'Download',
+    back:         'Back',
+    empty:        'No backups found!',
+    restoreTip:   'Restore this backup',
+    infoTip:      'Changes since previous backup',
+    restoreLine2: 'Are you sure you want to restore this backup?',
+    restoreLine3: 'The current world will be replaced.',
+    downloadLine2:'Are you sure you want to download the latest backup?',
+    downloadLine3:'It will be saved to your computer.',
+    backupAge:    'Backup (%s)',
+    justNow:      'just now',
+    minAgo:       'min ago',
+    minsAgo:      '%s mins ago',
+    hoursAgo:     '%s hours ago',
+    daysAgo:      '%s days ago',
+    monthsAgo:    '%s months ago',
+    yearsAgo:     '%s years ago'
+  };
+
+  /* ==========================================================
+     序列化
+     ========================================================== */
+  var STORAGE_KEY = 'mc_realms';
+  var FN_KEY = '__fn__';
+
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) {}
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return deserialize(JSON.parse(raw));
+    } catch (e) { return null; }
+  }
+
+  function saveData(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data))); } catch (e) {}
+  }
+
+  var DATA = loadData();
+  var server = null;
+  if (DATA && Array.isArray(DATA.servers)) {
+    for (var i = 0; i < DATA.servers.length; i++) {
+      if (DATA.servers[i].id === serverId) { server = DATA.servers[i]; break; }
+    }
+  }
+  if (!server) { location.href = 'realms.html'; return; }
+
+  var slotId = parseInt(slotParam, 10);
+  if (!(slotId >= 1 && slotId <= 3)) slotId = server.activeSlot || 1;
+
+  /* ==========================================================
+     备份数据
+     优先从 server.backups 读；没有就生成 mock
+     ========================================================== */
+  function loadBackups() {
+    if (Array.isArray(server.backups) && server.backups.length > 0) {
+      return server.backups;
+    }
+    return generateMockBackups();
+  }
+
+  function generateMockBackups() {
+    var now = Date.now();
+    var hour = 3600000;
+    return [
+      {
+        backupId: 'bk_latest',
+        lastModifiedDate: now - hour * 3,
+        size: 52428800,
+        metadata: {
+          'Game_mode': '0',
+          'Difficulty': '2',
+          'Seed': '1234567890',
+          'World_size': '50 MB'
+        },
+        changeList: {}
+      },
+      {
+        backupId: 'bk_2',
+        lastModifiedDate: now - hour * 24,
+        size: 51380224,
+        metadata: {
+          'Game_mode': '0',
+          'Difficulty': '2',
+          'Seed': '1234567890',
+          'World_size': '49 MB'
+        },
+        changeList: {}
+      },
+      {
+        backupId: 'bk_3',
+        lastModifiedDate: now - hour * 24 * 7,
+        size: 50331648,
+        metadata: {
+          'Game_mode': '0',
+          'Difficulty': '1',
+          'Seed': '1234567890',
+          'World_size': '48 MB'
+        },
+        changeList: {}
+      }
+    ];
+  }
+
+  var backups = loadBackups();
+
+  /* ==========================================================
+     时间呈现 —— 对齐 RealmsUtil.convertToAgePresentation
+     ========================================================== */
+  function agePresentation(ms) {
+    var seconds = Math.floor(ms / 1000);
+    if (seconds < 60) return TXT.justNow;
+
+    var minutes = Math.floor(seconds / 60);
+    if (minutes < 60) {
+      return minutes === 1 ? ('1 ' + TXT.minAgo) : TXT.minsAgo.replace('%s', minutes);
+    }
+
+    var hours = Math.floor(minutes / 60);
+    if (hours < 24) return TXT.hoursAgo.replace('%s', hours);
+
+    var days = Math.floor(hours / 24);
+    if (days < 30) return TXT.daysAgo.replace('%s', days);
+
+    var months = Math.floor(days / 30);
+    if (months < 12) return TXT.monthsAgo.replace('%s', months);
+
+    var years = Math.floor(days / 365);
+    return TXT.yearsAgo.replace('%s', years);
+  }
+
+  function datePresentation(ms) {
+    try {
+      var d = new Date(ms);
+      var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+      return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate()) +
+             ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    } catch (e) { return ''; }
+  }
+
+  /* ==========================================================
+     changeList —— 对齐 Java 的 generateChangeList
+     （只对相邻两个备份对比，取变化的字段）
+     ========================================================== */
+  function generateChangeList() {
+    if (backups.length <= 1) return;
+
+    for (var i = 0; i < backups.length - 1; i++) {
+      var cur = backups[i];
+      var prev = backups[i + 1];
+
+      if (!cur.metadata || !prev.metadata) continue;
+      if (!cur.changeList) cur.changeList = {};
+
+      for (var key in cur.metadata) {
+        if (key.indexOf('Uploaded') >= 0) continue;
+        if (!prev.metadata.hasOwnProperty(key)) {
+          cur.changeList[key] = cur.metadata[key];
+        } else if (cur.metadata[key] !== prev.metadata[key]) {
+          cur.changeList[key] = cur.metadata[key];
+        }
+      }
+    }
+  }
+  generateChangeList();
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var rootEl   = document.getElementById('rbk-root');
+  var listEl   = document.getElementById('rbk-list');
+  var emptyEl  = document.getElementById('rbk-empty');
+  var btnDown  = document.getElementById('btn-download');
+  var btnBack  = document.getElementById('btn-back');
+  var subLblEl = document.getElementById('rbk-sublabel');
+
+  /* 副标签 x = (w-150)/2 - 90 */
+  function layoutSubLabel() {
+    var W = rootEl.clientWidth || window.innerWidth;
+    subLblEl.style.left = ((W - 150) / 2 - 90) + 'px';
+  }
+
+  /* ==========================================================
+     渲染
+     ========================================================== */
+  function render() {
+    listEl.innerHTML = '';
+
+    if (backups.length === 0) {
+      emptyEl.classList.add('visible');
+      btnDown.disabled = true;
+      return;
+    }
+    emptyEl.classList.remove('visible');
+    btnDown.disabled = false;
+
+    for (var i = 0; i < backups.length; i++) {
+      listEl.appendChild(renderItem(backups[i], i));
+    }
+  }
+
+  function renderItem(backup, index) {
+    var el = document.createElement('div');
+    el.className = 'rbk-item';
+    el.dataset.index = String(index);
+
+    var ageMs = Date.now() - backup.lastModifiedDate;
+    if (ageMs < 0) ageMs = 0;
+
+    var nameEl = document.createElement('div');
+    nameEl.className = 'rbk-item-name';
+    if (backup.uploadedVersion) nameEl.classList.add('uploaded');
+    nameEl.textContent = TXT.backupAge.replace('%s', agePresentation(ageMs));
+    el.appendChild(nameEl);
+
+    var dateEl = document.createElement('div');
+    dateEl.className = 'rbk-item-date';
+    dateEl.textContent = datePresentation(backup.lastModifiedDate);
+    el.appendChild(dateEl);
+
+    /* restore icon（server.expired 时不显示） */
+    if (!server.expired) {
+      var restoreEl = document.createElement('div');
+      restoreEl.className = 'rbk-icon-restore';
+      restoreEl.title = TXT.restoreTip;
+      restoreEl.addEventListener('click', function(e) {
+        e.stopPropagation();
+        restoreClicked(index);
+      });
+      el.appendChild(restoreEl);
+    }
+
+    /* info icon（changeList 非空才显示） */
+    if (backup.changeList && Object.keys(backup.changeList).length > 0) {
+      var infoEl = document.createElement('div');
+      infoEl.className = 'rbk-icon-info';
+      infoEl.title = TXT.infoTip;
+      infoEl.addEventListener('click', function(e) {
+        e.stopPropagation();
+        openInfo(backup);
+      });
+      el.appendChild(infoEl);
+    }
+
+    return el;
+  }
+
+  /* ==========================================================
+     Restore —— long_confirm id=1
+     ========================================================== */
+  var pendingBackupIndex = -1;
+
+  function restoreClicked(index) {
+    if (index < 0 || index >= backups.length) return;
+    if (server.expired) return;
+
+    pendingBackupIndex = index;
+    var b = backups[index];
+    var dateStr = datePresentation(b.lastModifiedDate);
+    var ageStr  = agePresentation(Date.now() - b.lastModifiedDate);
+
+    goLongConfirm('warning',
+      TXT.restoreLine2 + '\n(' + dateStr + ', ' + ageStr + ')',
+      TXT.restoreLine3,
+      'yesno', 1);
+  }
+
+  function doRestore() {
+    var idx = pendingBackupIndex;
+    pendingBackupIndex = -1;
+    if (idx < 0 || idx >= backups.length) return;
+
+    var b = backups[idx];
+
+    /* 网页版简化：把该备份的 metadata 写回 slot，模拟恢复 */
+    if (!server.slots) server.slots = {};
+    server.slots[slotId] = server.slots[slotId] || {};
+    var s = server.slots[slotId];
+
+    if (b.metadata) {
+      if (b.metadata['Seed'] != null)   s.seed   = b.metadata['Seed'];
+      if (b.metadata['Difficulty'] != null) s.difficulty = parseInt(b.metadata['Difficulty'], 10) || 2;
+      if (b.metadata['Game_mode'] != null)  s.gameMode   = parseInt(b.metadata['Game_mode'], 10) || 0;
+    }
+
+    saveData(DATA);
+    goBack();
+  }
+
+  /* ==========================================================
+     Download —— long_confirm id=2
+     ========================================================== */
+  function downloadClicked() {
+    if (backups.length === 0) return;
+    goLongConfirm('info',
+      TXT.downloadLine2,
+      TXT.downloadLine3,
+      'yesno', 2);
+  }
+
+  function doDownload() {
+    /* 网页版无实际下载，模拟：生成一个文本文件让浏览器下载 */
+    try {
+      var b = backups[0];
+      var content =
+        'Realm: ' + (server.name || '') + '\n' +
+        'Backup ID: ' + b.backupId + '\n' +
+        'Date: ' + datePresentation(b.lastModifiedDate) + '\n' +
+        'Size: ' + b.size + ' bytes\n';
+      var blob = new Blob([content], { type: 'text/plain' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = (server.name || 'realm') + '_backup_' + b.backupId + '.txt';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+    } catch (e) {}
+
+    goBack();
+  }
+
+  /* ==========================================================
+     long_confirm
+     ========================================================== */
+  function goLongConfirm(type, line2, line3, mode, id) {
+    try {
+      localStorage.setItem('mc_realms_long_confirm', JSON.stringify({
+        type:  type,
+        line2: line2,
+        line3: line3,
+        mode:  mode,
+        id:    id,
+        back:  'realms_backup.html?id=' + encodeURIComponent(serverId) +
+               '&slot=' + slotId
+      }));
+    } catch (e) {}
+
+    var url = 'realms_long_confirm.html';
+    if (window.mcBack && typeof window.mcBack.jumpNoPush === 'function') {
+      window.mcBack.jumpNoPush(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  /* ==========================================================
+     Backup Info —— 跳详情页
+     ========================================================== */
+  function openInfo(backup) {
+    try {
+      localStorage.setItem('mc_realms_backup_info', JSON.stringify({
+        backupId: backup.backupId,
+        changeList: backup.changeList || {}
+      }));
+    } catch (e) {}
+
+    var url = 'realms_backup_info.html?id=' + encodeURIComponent(serverId) +
+              '&slot=' + slotId +
+              '&backup=' + encodeURIComponent(backup.backupId);
+    if (window.mcBack && typeof window.mcBack.jump === 'function') {
+      window.mcBack.jump(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  /* ==========================================================
+     返回
+     ========================================================== */
+  function goBack() {
+    var url = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  btnDown.addEventListener('click', function() {
+    if (btnDown.disabled) return;
+    downloadClicked();
+  });
+  btnBack.addEventListener('click', goBack);
+
+  /* ==========================================================
+     处理 long_confirm 结果
+     ========================================================== */
+  (function handleResult() {
+    var raw = null;
+    try {
+      raw = localStorage.getItem('mc_realms_long_confirm_result');
+      if (raw) localStorage.removeItem('mc_realms_long_confirm_result');
+    } catch (e) { return; }
+    if (!raw) return;
+
+    var res;
+    try { res = JSON.parse(raw); } catch (e) { return; }
+    if (!res || res.result !== true) return;
+
+    if (res.id === 1) doRestore();
+    else if (res.id === 2) doDownload();
+  })();
+
+  /* ==========================================================
+     Esc
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { e.preventDefault(); goBack(); }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  layoutSubLabel();
+  render();
+  window.addEventListener('resize', layoutSubLabel);
+
+})();
+</script>
+
+</body>
+</html>

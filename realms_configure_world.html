@@ -721,9 +721,19 @@ btnOptions.addEventListener('click', function() {
     location.href = url;
   }
 });
-  btnBackup.addEventListener('click', function() {
-    placeholder('Backups');
-  });
+  // 原来是
+
+
+// 改成
+btnBackup.addEventListener('click', function() {
+  var url = 'realms_backup.html?id=' + encodeURIComponent(serverId) +
+            '&slot=' + encodeURIComponent(activeSlot);
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;
+  }
+});
 
 
 // 改成

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Backup Info</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .rbi-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rbi-root > * { pointer-events: auto; }
+
+  /* 标题 @ (w/2, 10) */
+  .rbi-title {
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    top: 10px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none; white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* 列表：顶 32 → 底 h-64 */
+  .rbi-list-wrap {
+    position: absolute;
+    left: 0; right: 0;
+    top: 32px;
+    bottom: 64px;
+    overflow-y: auto; overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  .rbi-list { width: 100%; }
+
+  .rbi-item {
+    position: relative;
+    width: 320px;
+    height: 36px;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+
+  /* key @ (w/2 - 40, y)，色 0xA0A0A0 */
+  .rbi-item-key {
+    position: absolute;
+    left: 0; top: 0;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    white-space: nowrap;
+  }
+  /* value @ (w/2 - 40, y + 12)，色 0xFFFFFF */
+  .rbi-item-value {
+    position: absolute;
+    left: 0; top: 12px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #FFFFFF;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    white-space: nowrap;
+  }
+
+  /* Back 按钮：w/2 - 100, h/4 + 120 + 24 默认 200 */
+  .rbi-btn-back {
+    position: absolute;
+    left: calc(50% - 100px);
+    top: calc(25% + 144px);
+  }
+
+  /* 空状态 */
+  .rbi-empty {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%;
+    text-align: center;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    pointer-events: none;
+    display: none;
+  }
+  .rbi-empty.visible { display: block; }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rbi-root" id="rbi-root">
+
+  <div class="rbi-title" id="rbi-title">Changes from last backup</div>
+
+  <div class="rbi-list-wrap mc-scroll" id="rbi-list-wrap">
+    <div class="rbi-list" id="rbi-list"></div>
+  </div>
+
+  <div class="rbi-empty" id="rbi-empty">No changes to display</div>
+
+  <button class="mcbtn mcbtn-long rbi-btn-back" id="btn-back" type="button">Back</button>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     参数
+     ========================================================== */
+  var params     = new URLSearchParams(location.search);
+  var serverId   = params.get('id') || '';
+  var slotParam  = params.get('slot') || '';
+  var backupId   = params.get('backup') || '';
+
+  if (!serverId) {
+    try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+    catch (e) {}
+  }
+
+  var slotId = parseInt(slotParam, 10);
+  if (!(slotId >= 1 && slotId <= 3)) slotId = 1;
+
+  /* ==========================================================
+     文案
+     ========================================================== */
+  var TXT = {
+    title: 'Changes from last backup',
+    back:  'Back',
+    empty: 'No changes to display',
+    difficulties: ['Peaceful', 'Easy', 'Normal', 'Hard'],
+    gameModes:    ['Survival', 'Creative', 'Adventure']
+  };
+
+  /* ==========================================================
+     changeList 数据
+     ========================================================== */
+  var changeList = {};
+
+  function loadChangeList() {
+    try {
+      var raw = localStorage.getItem('mc_realms_backup_info');
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (obj && obj.backupId === backupId) return obj.changeList || {};
+    } catch (e) {}
+    return null;
+  }
+
+  changeList = loadChangeList() || {};
+  try { localStorage.removeItem('mc_realms_backup_info'); } catch (e) {}
+
+  /* ==========================================================
+     特殊字段处理 —— 对齐 Java 的 checkForSpecificMetadata
+     ========================================================== */
+  function formatValue(key, value) {
+    var k = key.toLowerCase();
+    if (k.indexOf('game') >= 0 && k.indexOf('mode') >= 0) {
+      var idx = parseInt(value, 10);
+      return TXT.gameModes[idx] || 'UNKNOWN';
+    }
+    if (k.indexOf('game') >= 0 && k.indexOf('difficulty') >= 0) {
+      var idx2 = parseInt(value, 10);
+      return TXT.difficulties[idx2] || 'UNKNOWN';
+    }
+    return value;
+  }
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var listEl  = document.getElementById('rbi-list');
+  var emptyEl = document.getElementById('rbi-empty');
+  var btnBack = document.getElementById('btn-back');
+
+  btnBack.textContent = TXT.back;
+
+  /* ==========================================================
+     渲染
+     ========================================================== */
+  function render() {
+    listEl.innerHTML = '';
+
+    var keys = Object.keys(changeList);
+    if (keys.length === 0) {
+      emptyEl.classList.add('visible');
+      return;
+    }
+    emptyEl.classList.remove('visible');
+
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var raw = changeList[key];
+      var val = formatValue(key, raw);
+
+      var item = document.createElement('div');
+      item.className = 'rbi-item';
+
+      var kEl = document.createElement('div');
+      kEl.className = 'rbi-item-key';
+      kEl.textContent = key;
+      item.appendChild(kEl);
+
+      var vEl = document.createElement('div');
+      vEl.className = 'rbi-item-value';
+      vEl.textContent = val;
+      item.appendChild(vEl);
+
+      listEl.appendChild(item);
+    }
+  }
+
+  /* ==========================================================
+     返回
+     ========================================================== */
+  function goBack() {
+    var url = 'realms_backup.html?id=' + encodeURIComponent(serverId) +
+              '&slot=' + slotId;
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  btnBack.addEventListener('click', goBack);
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { e.preventDefault(); goBack(); }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  render();
+
+})();
+</script>
+
+</body>
+</html>
