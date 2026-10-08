@@ -286,3 +286,48 @@
 .mcbtn-44:disabled {
   background-image: url('../assets/button/button_disabled_44.png');
 }
+/* ==========================================================
+   Realms Configure World 专用尺寸
+   ========================================================== */
+
+/* 100×20 —— 顶部三按钮 + Switch Minigame */
+.mcbtn-100 {
+  width: 100px;
+  height: 20px;
+  background-image: url('../assets/button/button_100.png');
+}
+.mcbtn-100:hover:not(:disabled),
+.mcbtn-100:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_100.png');
+}
+.mcbtn-100:disabled {
+  background-image: url('../assets/button/button_disabled_100.png');
+}
+
+/* 90×20 —— Options / Backups / Reset World */
+.mcbtn-90 {
+  width: 90px;
+  height: 20px;
+  background-image: url('../assets/button/button_90.png');
+}
+.mcbtn-90:hover:not(:disabled),
+.mcbtn-90:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_90.png');
+}
+.mcbtn-90:disabled {
+  background-image: url('../assets/button/button_disabled_90.png');
+}
+
+/* 70×20 —— Back */
+.mcbtn-70 {
+  width: 70px;
+  height: 20px;
+  background-image: url('../assets/button/button_70.png');
+}
+.mcbtn-70:hover:not(:disabled),
+.mcbtn-70:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_70.png');
+}
+.mcbtn-70:disabled {
+  background-image: url('../assets/button/button_disabled_70.png');
+}

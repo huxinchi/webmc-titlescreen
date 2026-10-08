@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Configure Realm</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="image" href="assets/realm_status/open.png">
+<link rel="preload" as="image" href="assets/realm_status/closed.png">
+<link rel="preload" as="image" href="assets/realm_status/expired.png">
+<link rel="preload" as="image" href="assets/realm_status/expires_soon.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .rcw-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rcw-root > * { pointer-events: auto; }
+
+  /* ---------- 标题区 ---------- */
+  .rcw-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 12px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .rcw-server-name {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 24px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #55FF55;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    white-space: nowrap;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .rcw-server-name[data-state="closed"] { color: #AAAAAA; }
+  .rcw-server-name[data-state="expired"] { color: #808080; }
+
+  /* ---------- 状态图标 ---------- */
+  .rcw-status {
+    position: absolute;
+    top: 7px;
+    width: 10px;
+    height: 28px;
+    background-repeat: no-repeat;
+    background-size: 10px 28px;
+    cursor: help;
+  }
+  .rcw-status[data-state="open"]         { background-image: url('assets/realm_status/open.png'); }
+  .rcw-status[data-state="closed"]       { background-image: url('assets/realm_status/closed.png'); }
+  .rcw-status[data-state="expired"]      { background-image: url('assets/realm_status/expired.png'); }
+  .rcw-status[data-state="expires_soon"] {
+    background-image: url('assets/realm_status/expires_soon.png');
+    background-size: 10px 56px;
+    animation: realm-expires var(--realm-expires-duration, 1000ms) linear infinite;
+  }
+
+  /* ---------- 顶部 3 按钮 ---------- */
+/* ---------- 顶部 3 按钮 ---------- */
+.rcw-topbtn {
+  position: absolute;
+  top: 40px;
+  /* 尺寸由 .mcbtn-100 提供，不再内联 width/height */
+}
+
+  /* ---------- Slot 区域标题 ---------- */
+  .rcw-worlds-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 92px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  /* ---------- Slot 图标 ---------- */
+  .rcw-slot {
+    position: absolute;
+    top: 110px;
+    width: 80px;
+    height: 80px;
+    box-sizing: border-box;
+    background-color: #000;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    cursor: pointer;
+    /* 边框手绘：外白内黑 */
+    border: 1px solid #000000;
+    outline: 1px solid #808080;
+    outline-offset: -1px;
+  }
+  .rcw-slot[data-active="1"] {
+    outline: 1px solid #FFFFFF;
+  }
+  .rcw-slot[data-hover="1"] {
+    outline: 1px solid #FFFFFF;
+  }
+  .rcw-slot[data-empty="1"] {
+    /* 空槽用暗淡边框 */
+    outline: 1px solid #404040;
+    background-color: #202020;
+  }
+  .rcw-slot[data-empty="1"][data-hover="1"] {
+    outline: 1px solid #A0A0A0;
+  }
+
+  /* Slot 内名称（底部居中，类似原版 y+66 处） */
+  .rcw-slot-name {
+    position: absolute;
+    left: 0; right: 0;
+    top: 66px;
+    text-align: center;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #FFFFFF;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    pointer-events: none;
+  }
+  /* 内容背景压暗层（非 active 时） */
+  .rcw-slot-dim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+  }
+  .rcw-slot[data-active="1"] .rcw-slot-dim { display: none; }
+
+  /* ---------- Minigame 名显示 ---------- */
+  .rcw-minigame-name {
+    position: absolute;
+    top: 209px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  /* ---------- 底部按钮 ---------- */
+/* ---------- 底部按钮 ---------- */
+.rcw-bottombar {
+  position: absolute;
+  top: 204px;
+  /* 尺寸由 .mcbtn-90 / -100 / -70 提供 */
+}
+
+  /* ---------- Tooltip ---------- */
+  .rcw-tooltip {
+    position: fixed;
+    z-index: 9999;
+    max-width: 220px;
+    padding: 3px 5px;
+    background: rgba(0, 0, 0, 0.85);
+    color: #ffffff;
+    font-family: 'Minecraft', monospace;
+    font-size: 10px;
+    line-height: 1.3;
+    white-space: pre-line;
+    pointer-events: none;
+    display: none;
+    box-shadow: 0 0 0 1px #2c2c2c;
+  }
+  .rcw-tooltip.visible { display: block; }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rcw-root" id="rcw-root">
+
+  <div class="rcw-title" id="rcw-title">Configure Realm</div>
+  <div class="rcw-server-name" id="rcw-server-name"></div>
+
+  <div class="rcw-status" id="rcw-status" style="display:none"></div>
+
+<button class="mcbtn mcbtn-100 rcw-topbtn" id="btn-players"></button>
+<button class="mcbtn mcbtn-100 rcw-topbtn" id="btn-settings"></button>
+<button class="mcbtn mcbtn-100 rcw-topbtn" id="btn-subscription"></button>
+
+  <div class="rcw-worlds-title" id="rcw-worlds-title">Worlds</div>
+
+  <!-- 4 个 slot 由 JS 生成 -->
+
+  <div class="rcw-minigame-name" id="rcw-minigame-name" style="display:none"></div>
+
+ <button class="mcbtn mcbtn-90 rcw-bottombar" id="btn-options"></button>
+<button class="mcbtn mcbtn-90 rcw-bottombar" id="btn-backup"></button>
+<button class="mcbtn mcbtn-90 rcw-bottombar" id="btn-reset-world"></button>
+<button class="mcbtn mcbtn-100 rcw-bottombar" id="btn-switch-minigame" style="display:none"></button>
+<button class="mcbtn mcbtn-70 rcw-bottombar" id="btn-back"></button>
+</div>
+
+<div class="rcw-tooltip" id="rcw-tooltip"></div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     硬编码文案（Realms 是英文的）
+     ========================================================== */
+  var TXT = {
+    title:          'Configure Realm',
+    worlds:         'Worlds',
+    players:        'Players',
+    settings:       'Settings',
+    subscription:   'Subscription',
+    options:        'World Options',
+    backup:         'Backups',
+    resetWorld:     'Reset World',
+    switchMinigame: 'Switch Minigame',
+    back:           'Back',
+    minigameName:   'Current Minigame: %s',
+    slotName:       'World %d',
+    minigameSlot:   'Minigame',
+    empty:          'Empty',
+    tooltipSlot:    'Click to switch to this world',
+    tooltipMinigame:'Click to select a minigame',
+    tooltipActive:  'Double-click to play',
+    expired:        'Expired realm',
+    open:           'Open realm',
+    closed:         'Closed realm',
+    expiresSoon:    'Expires soon',
+    expiresDay:     'Expires in a day',
+    expiresDays:    'Expires in %s days'
+  };
+
+  /* ==========================================================
+     参数
+     ========================================================== */
+  var params   = new URLSearchParams(location.search);
+  var serverId = params.get('id') || '';
+
+  /* ==========================================================
+     读取 realms.html 的 DATA
+     ========================================================== */
+  var STORAGE_KEY = 'mc_realms';
+  var FN_KEY = '__fn__';
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) {}
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      return obj ? deserialize(obj) : null;
+    } catch (e) { return null; }
+  }
+
+  function saveData(data) {
+    try {
+      // 注意：这个版本不做深度序列化，会丢函数
+      // 直接复用 realms.html 里写过的方法即可
+      // 但为了安全，先只做浅层 clone + 序列化函数
+    } catch (e) {}
+  }
+
+  var DATA = loadData();
+  if (!DATA) {
+    location.href = 'realms.html';
+    return;
+  }
+
+  var server = null;
+  for (var i = 0; i < (DATA.servers || []).length; i++) {
+    if (DATA.servers[i].id === serverId) { server = DATA.servers[i]; break; }
+  }
+
+  if (!server) {
+    location.href = 'realms.html';
+    return;
+  }
+
+  /* ==========================================================
+     状态
+     ========================================================== */
+  var STATE = effectiveState(server);
+  var isMinigame = server.worldType === 'MINIGAME';
+  var activeSlot = server.activeSlot || 1;
+
+  function effectiveState(s) {
+    if (!s) return 'closed';
+    if (s.expired) return 'expired';
+    if (s.state === 'closed') return 'closed';
+    if (s.state === 'open') {
+      var d = s.daysLeft;
+      if (d != null && d < 7) return 'expires_soon';
+      return 'open';
+    }
+    return 'closed';
+  }
+
+  function isSelfOwned(s) {
+    return s && s.ownerUUID === DATA.ownUUID;
+  }
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var rootEl      = document.getElementById('rcw-root');
+  var titleEl     = document.getElementById('rcw-title');
+  var nameEl      = document.getElementById('rcw-server-name');
+  var statusEl    = document.getElementById('rcw-status');
+  var worldsTitle = document.getElementById('rcw-worlds-title');
+  var minigameNm  = document.getElementById('rcw-minigame-name');
+  var tooltipEl   = document.getElementById('rcw-tooltip');
+
+  var btnPlayers      = document.getElementById('btn-players');
+  var btnSettings     = document.getElementById('btn-settings');
+  var btnSubscription = document.getElementById('btn-subscription');
+  var btnOptions      = document.getElementById('btn-options');
+  var btnBackup       = document.getElementById('btn-backup');
+  var btnResetWorld   = document.getElementById('btn-reset-world');
+  var btnSwitchMin   = document.getElementById('btn-switch-minigame');
+  var btnBack         = document.getElementById('btn-back');
+
+  /* ==========================================================
+     布局（对齐 Java）
+     - top buttons: row(0)=40, 3 buttons center
+       centerButton(i, 3) = width/2 - 155 + i*105
+     - slot frame: row(5)+5 = 110, 80×80, spacing 18
+       frame(i) = left_x + (i-1)*98, left_x = width/2 - 187
+     - bottom: row(13)-5 = 204
+       leftButton(i) = left_x + i*95
+       back: right_x - 80 + 8 = width/2 + 118
+     ========================================================== */
+
+  /* 顶部按钮：left 从 50% 偏移 */
+  var TOP_BTNS = [
+    { el: btnPlayers,      label: TXT.players,      offsetX: -155, width: 100 },
+    { el: btnSettings,     label: TXT.settings,     offsetX: -50,  width: 100 },
+    { el: btnSubscription, label: TXT.subscription, offsetX: 55,   width: 100 }
+  ];
+  TOP_BTNS.forEach(function(b) {
+  b.el.textContent = b.label;
+  b.el.style.left = 'calc(50% + ' + b.offsetX + 'px)';
+  /* 尺寸由 .mcbtn-100 提供 */
+});
+  /* 底部按钮 */
+  var BOTTOM_BTNS = [
+    { el: btnOptions,    label: TXT.options,    offsetX: -187, width: 90 },
+    { el: btnBackup,     label: TXT.backup,     offsetX: -92,  width: 90 },
+    { el: btnResetWorld, label: TXT.resetWorld, offsetX: 3,    width: 90 }
+  ];
+  BOTTOM_BTNS.forEach(function(b) {
+    b.el.textContent = b.label;
+    b.el.style.left = 'calc(50% + ' + b.offsetX + 'px)';
+    b.el.style.width = b.width + 'px';
+    b.el.style.height = '20px';
+  });
+
+BOTTOM_BTNS.forEach(function(b) {
+  b.el.textContent = b.label;
+  b.el.style.left = 'calc(50% + ' + b.offsetX + 'px)';
+  /* 尺寸由 .mcbtn-90 提供 */
+});
+
+btnSwitchMin.textContent = TXT.switchMinigame;
+btnSwitchMin.style.left = 'calc(50% - 187px)';
+/* 尺寸由 .mcbtn-100 提供 */
+
+btnBack.textContent = TXT.back;
+btnBack.style.left = 'calc(50% + 118px)';
+/* 尺寸由 .mcbtn-70 提供 */
+
+  /* ==========================================================
+     渲染
+     ========================================================== */
+  function render() {
+    titleEl.textContent = TXT.title;
+    nameEl.textContent = server.name || '';
+    nameEl.dataset.state = STATE;
+    worldsTitle.textContent = TXT.worlds;
+
+    /* 状态图标 */
+    statusEl.style.display = 'block';
+    statusEl.dataset.state = STATE;
+    statusEl.style.left = 'calc(50% + 124px)';
+    statusEl.addEventListener('mouseenter', function() { showStatusTooltip(); });
+    statusEl.addEventListener('mouseleave', hideTooltip);
+
+    /* Minigame 名（如果当前是 minigame） */
+    if (isMinigame && server.minigameName) {
+      minigameNm.style.display = '';
+      minigameNm.textContent = TXT.minigameName.replace('%s', server.minigameName);
+      minigameNm.style.left = 'calc(50% - 77px)';
+    } else {
+      minigameNm.style.display = 'none';
+    }
+
+    /* 按钮激活状态（对齐 disableButtons） */
+    var expired = !!server.expired;
+    btnPlayers.disabled = expired;
+    btnSettings.disabled = expired;
+    btnSubscription.disabled = false;   /* subscription 一直可用 */
+    btnOptions.disabled = expired;
+    btnBackup.disabled = false;
+    btnResetWorld.disabled = expired;
+    btnSwitchMin.disabled = expired;
+
+    /* Minigame 模式：换底部按钮 */
+    if (isMinigame) {
+      btnOptions.style.display = 'none';
+      btnBackup.style.display = 'none';
+      btnResetWorld.style.display = 'none';
+      btnSwitchMin.style.display = '';
+    } else {
+      btnOptions.style.display = '';
+      btnBackup.style.display = '';
+      btnResetWorld.style.display = '';
+      btnSwitchMin.style.display = 'none';
+    }
+
+    renderSlots();
+  }
+
+  /* ==========================================================
+     Slot 渲染
+     ========================================================== */
+  var SLOT_BG = {
+    1: 'assets/background/panorama_0.png',
+    2: 'assets/background/panorama_2.png',
+    3: 'assets/background/panorama_3.png'
+  };
+
+  function getSlots() {
+    return server.slots || {};
+  }
+
+  function slotData(slotId) {
+    var slots = getSlots();
+    var s = slots[slotId];
+    if (!s) return { empty: true, name: TXT.empty };
+    return {
+      empty: !!s.empty,
+      name: s.name || TXT.slotName.replace('%d', slotId),
+      image: s.image || SLOT_BG[slotId]
+    };
+  }
+
+  function renderSlots() {
+    /* 清掉旧 slot */
+    var oldSlots = rootEl.querySelectorAll('.rcw-slot');
+    for (var k = 0; k < oldSlots.length; k++) oldSlots[k].remove();
+
+    /* 4 个 slot：1/2/3 + minigame */
+    var SLOT_OFFSETS = [-187, -89, 9, 107];
+
+    for (var i = 1; i <= 4; i++) {
+      var isMinigameSlot = (i === 4);
+      var data;
+
+      if (isMinigameSlot) {
+        data = {
+          empty: !isMinigame,
+          name: TXT.minigameSlot,
+          image: isMinigame ? server.minigameImage : null
+        };
+      } else {
+        data = slotData(i);
+      }
+
+      var isActive = isMinigameSlot ? isMinigame : (activeSlot === i && !isMinigame);
+
+      var slotEl = document.createElement('div');
+      slotEl.className = 'rcw-slot';
+      slotEl.dataset.slotId = String(i);
+      slotEl.style.left = 'calc(50% + ' + SLOT_OFFSETS[i - 1] + 'px)';
+      slotEl.style.backgroundImage = data.image ? 'url("' + data.image + '")' : 'none';
+      if (data.empty) slotEl.dataset.empty = '1';
+      if (isActive)   slotEl.dataset.active = '1';
+
+      /* dim 层 */
+      var dim = document.createElement('div');
+      dim.className = 'rcw-slot-dim';
+      slotEl.appendChild(dim);
+
+      /* 名称 */
+      var nameEl2 = document.createElement('div');
+      nameEl2.className = 'rcw-slot-name';
+      nameEl2.textContent = data.name;
+      slotEl.appendChild(nameEl2);
+
+      /* 事件 */
+      (function(slotId, isEmpty, isActiveSlot) {
+        slotEl.addEventListener('mouseenter', function() {
+          slotEl.dataset.hover = '1';
+          showSlotTooltip(slotId, isEmpty, isActiveSlot);
+        });
+        slotEl.addEventListener('mouseleave', function() {
+          slotEl.dataset.hover = '';
+          hideTooltip();
+        });
+        slotEl.addEventListener('click', function(e) {
+          e.stopPropagation();
+          onSlotClick(slotId, isEmpty, isActiveSlot);
+        });
+        slotEl.addEventListener('dblclick', function(e) {
+          e.stopPropagation();
+          onSlotDblClick(isActiveSlot);
+        });
+      })(i, data.empty, isActive);
+
+      rootEl.appendChild(slotEl);
+    }
+  }
+
+  /* ==========================================================
+     Slot 点击
+     ========================================================== */
+  function onSlotClick(slotId, isEmpty, isActiveSlot) {
+    if (isActiveSlot) {
+      /* 单击 active slot 不做切换（原版用双击播放） */
+      return;
+    }
+
+    if (slotId < 4) {
+      /* 弹确认框：切换槽位 */
+      var line2 = 'Switch to this world?';
+      var line3 = 'This will change the active world slot.';
+      goLongConfirm('info', line2, line3, 'yesno', slotId);
+    } else if (slotId === 4) {
+      /* 弹模板选择（待实现） */
+      window.mcDialog.alert({
+        title: 'Minigame Templates',
+        message: 'Minigame template selection is not available yet.'
+      });
+    }
+  }
+
+  function onSlotDblClick(isActiveSlot) {
+    if (!isActiveSlot) return;
+    if (server.expired) return;
+    if (server.state !== 'open' && server.state !== 'closed') return;
+
+    if (server.state === 'open') {
+      /* 直接 Play */
+      if (typeof server.onJoin === 'function') {
+        try { server.onJoin.call(server); return; } catch (e) {}
+      }
+      var url = 'realms_connecting.html?id=' + encodeURIComponent(server.id);
+      if (window.mcBack && typeof window.mcBack.jump === 'function') {
+        window.mcBack.jump(url);
+      } else {
+        location.href = url;
+      }
+    } else if (server.state === 'closed') {
+      /* 打开世界（原版 openTheWorld） */
+      window.mcDialog.alert({
+        title: 'Open Realm',
+        message: 'Opening the realm is not available yet.'
+      });
+    }
+  }
+
+  /* ==========================================================
+     跳长确认框
+     ========================================================== */
+  function goLongConfirm(type, line2, line3, mode, id) {
+    try {
+      localStorage.setItem('mc_realms_long_confirm', JSON.stringify({
+        type: type,
+        line2: line2,
+        line3: line3,
+        mode: mode,
+        id: id,
+        back: 'realms_configure_world.html?id=' + encodeURIComponent(serverId)
+      }));
+    } catch (e) {}
+
+    var url = 'realms_long_confirm.html';
+    if (window.mcBack && typeof window.mcBack.jumpNoPush === 'function') {
+      window.mcBack.jumpNoPush(url);
+    } else {
+      location.href = url;
+    }
+  }
+
+  /* ==========================================================
+     底部按钮
+     ========================================================== */
+  btnPlayers.addEventListener('click', function() {
+    placeholder('Players');
+  });
+  btnSettings.addEventListener('click', function() {
+    placeholder('Settings');
+  });
+  btnSubscription.addEventListener('click', function() {
+    placeholder('Subscription');
+  });
+  btnOptions.addEventListener('click', function() {
+    placeholder('World Options');
+  });
+  btnBackup.addEventListener('click', function() {
+    placeholder('Backups');
+  });
+  btnResetWorld.addEventListener('click', function() {
+    placeholder('Reset World');
+  });
+  btnSwitchMin.addEventListener('click', function() {
+    placeholder('Switch Minigame');
+  });
+
+  btnBack.addEventListener('click', function() {
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('realms.html');
+    } else {
+      location.href = 'realms.html';
+    }
+  });
+
+  function placeholder(name) {
+    window.mcDialog.alert({
+      title: name,
+      message: name + ' screen is not available yet.'
+    });
+  }
+
+  /* ==========================================================
+     Tooltip
+     ========================================================== */
+  function showTooltip(text) {
+    if (!text) return;
+    tooltipEl.textContent = text;
+    tooltipEl.classList.add('visible');
+  }
+  function hideTooltip() { tooltipEl.classList.remove('visible'); }
+
+  function showStatusTooltip() {
+    var text = '';
+    if (STATE === 'expired') text = TXT.expired;
+    else if (STATE === 'closed') text = TXT.closed;
+    else if (STATE === 'open') text = TXT.open;
+    else if (STATE === 'expires_soon') {
+      var d = server.daysLeft;
+      if (d == null || d <= 0) text = TXT.expiresSoon;
+      else if (d === 1) text = TXT.expiresDay;
+      else text = TXT.expiresDays.replace('%s', d);
+    }
+    showTooltip(text);
+  }
+
+  function showSlotTooltip(slotId, isEmpty, isActiveSlot) {
+    var text = '';
+    if (isActiveSlot) text = TXT.tooltipActive;
+    else if (slotId === 4) text = TXT.tooltipMinigame;
+    else text = TXT.tooltipSlot;
+    showTooltip(text);
+  }
+
+  document.addEventListener('mousemove', function(e) {
+    if (!tooltipEl.classList.contains('visible')) return;
+    var x = e.clientX + 12;
+    var y = e.clientY + 8;
+    var w = tooltipEl.offsetWidth;
+    if (x + w > window.innerWidth - 4) x = e.clientX - w - 12;
+    tooltipEl.style.left = x + 'px';
+    tooltipEl.style.top  = y + 'px';
+  });
+
+  /* ==========================================================
+     键盘
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (window.mcBack && typeof window.mcBack.back === 'function') {
+        window.mcBack.back('realms.html');
+      } else {
+        location.href = 'realms.html';
+      }
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  render();
+
+  /* 处理从 long confirm 返回的结果 */
+  (function handleLongConfirmResult() {
+    var raw = null;
+    try {
+      raw = localStorage.getItem('mc_realms_long_confirm_result');
+      if (raw) localStorage.removeItem('mc_realms_long_confirm_result');
+    } catch (e) { return; }
+    if (!raw) return;
+
+    var res;
+    try { res = JSON.parse(raw); } catch (e) { return; }
+    if (!res || !res.id) return;
+
+    /* id 10 → 切换槽位确认 */
+    if (res.id === 10 && res.result === true) {
+      window.mcDialog.alert({
+        title: 'Switch Slot',
+        message: 'Switching world slots is not available yet.'
+      });
+    }
+  })();
+
+})();
+</script>
+
+</body>
+</html>

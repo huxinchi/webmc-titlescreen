@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Confirm</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .rlc-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rlc-root > * { pointer-events: auto; }
+
+  /* row(2) = 66 */
+  .rlc-type {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 66px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    text-align: center;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .rlc-type[data-type="warning"] { color: #FF5555; }
+  .rlc-type[data-type="info"]    { color: #7DA9F3; }
+
+  /* row(4) = 92 */
+  .rlc-line2 {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 92px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    text-align: center;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  /* row(6) = 118 */
+  .rlc-line3 {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 118px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    text-align: center;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  /* row(8) = 144 */
+/* row(8) = 144 */
+.rlc-btn {
+  position: absolute;
+  top: 144px;
+  /* 尺寸由 .mcbtn-100 提供 */
+}
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rlc-root">
+
+  <div class="rlc-type"  id="rlc-type"></div>
+  <div class="rlc-line2" id="rlc-line2"></div>
+  <div class="rlc-line3" id="rlc-line3"></div>
+
+<button class="mcbtn mcbtn-100 rlc-btn" id="rlc-yes" style="left: calc(50% - 105px);"></button>
+<button class="mcbtn mcbtn-100 rlc-btn" id="rlc-no"  style="left: calc(50% + 5px);"></button>
+<button class="mcbtn mcbtn-100 rlc-btn" id="rlc-ok"  style="left: calc(50% - 50px);"></button>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  var params = new URLSearchParams(location.search);
+
+  /* 参数（可覆盖 localStorage 里的） */
+  var info = {};
+  try {
+    var raw = localStorage.getItem('mc_realms_long_confirm');
+    if (raw) {
+      info = JSON.parse(raw) || {};
+      localStorage.removeItem('mc_realms_long_confirm');
+    }
+  } catch (e) {}
+
+  var type = params.get('type') || info.type || 'info';
+  var line2 = params.get('line2') || info.line2 || '';
+  var line3 = params.get('line3') || info.line3 || '';
+  var mode  = params.get('mode')  || info.mode  || 'yesno';
+  var id    = params.get('id')    || info.id    || 0;
+  var back  = params.get('back')  || info.back  || 'realms.html';
+
+  var typeEl  = document.getElementById('rlc-type');
+  var line2El = document.getElementById('rlc-line2');
+  var line3El = document.getElementById('rlc-line3');
+  var yesBtn  = document.getElementById('rlc-yes');
+  var noBtn   = document.getElementById('rlc-no');
+  var okBtn   = document.getElementById('rlc-ok');
+
+  typeEl.dataset.type = (type === 'warning') ? 'warning' : 'info';
+  typeEl.textContent  = (type === 'warning') ? 'Warning!' : 'Info!';
+  line2El.textContent = line2;
+  line3El.textContent = line3;
+
+  if (mode === 'ok') {
+    yesBtn.style.display = 'none';
+    noBtn.style.display  = 'none';
+    okBtn.textContent = 'OK';
+  } else {
+    okBtn.style.display = 'none';
+    yesBtn.textContent = 'Yes';
+    noBtn.textContent  = 'No';
+  }
+
+  function setResult(result) {
+    try {
+      localStorage.setItem('mc_realms_long_confirm_result', JSON.stringify({
+        result: result,
+        id: id
+      }));
+    } catch (e) {}
+  }
+
+  function goBack() {
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(back);
+    } else {
+      location.href = back;
+    }
+  }
+
+  yesBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    setResult(true);
+    goBack();
+  });
+
+  okBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    setResult(true);
+    goBack();
+  });
+
+  noBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    setResult(false);
+    goBack();
+  });
+
+  /* Esc = No / OK-false（对齐 keyPressed） */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setResult(false);
+      goBack();
+    }
+  }, true);
+
+})();
+</script>
+
+</body>
+</html>
