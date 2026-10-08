@@ -362,3 +362,20 @@
 .mcbtn-83:disabled {
   background-image: url('../assets/button/button_disabled_83.png');
 }
+/* ==========================================================
+   Realms Settings 专用尺寸
+   ========================================================== */
+
+/* 106×20 —— Open/Close / Done / Cancel */
+.mcbtn-106 {
+  width: 106px;
+  height: 20px;
+  background-image: url('../assets/button/button_106.png');
+}
+.mcbtn-106:hover:not(:disabled),
+.mcbtn-106:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_106.png');
+}
+.mcbtn-106:disabled {
+  background-image: url('../assets/button/button_disabled_106.png');
+}

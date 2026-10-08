@@ -677,9 +677,17 @@ btnBack.style.left = 'calc(50% + 118px)';
   btnSubscription.addEventListener('click', function() {
     placeholder('Subscription');
   });
-  btnOptions.addEventListener('click', function() {
-    placeholder('World Options');
-  });
+
+
+// 改成
+btnOptions.addEventListener('click', function() {
+  var url = 'realms_settings.html?id=' + encodeURIComponent(serverId);
+  if (window.mcBack && typeof window.mcBack.jump === 'function') {
+    window.mcBack.jump(url);
+  } else {
+    location.href = url;   // 兜底
+  }
+});
   btnBackup.addEventListener('click', function() {
     placeholder('Backups');
   });

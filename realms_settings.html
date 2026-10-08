@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Realm Settings</title>
+
+<link rel="preload" as="image" href="assets/background/panorama_equirect.png">
+<link rel="preload" as="image" href="assets/background/panorama_0.png">
+<link rel="preload" as="image" href="assets/background/panorama_1.png">
+<link rel="preload" as="image" href="assets/background/panorama_2.png">
+<link rel="preload" as="image" href="assets/background/panorama_3.png">
+<link rel="preload" as="image" href="assets/background/panorama_4.png">
+<link rel="preload" as="image" href="assets/background/panorama_5.png">
+<link rel="preload" as="audio" href="assets/sound/click.ogg">
+
+<link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/pano.css">
+<script src="js/font.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    font-family: 'Minecraft', monospace;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    position: relative;
+  }
+
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .rls-root {
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ui-scale, 1));
+    transform-origin: top center;
+    width:  calc(100vw / var(--ui-scale, 1));
+    height: calc(100vh / var(--ui-scale, 1));
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .rls-root > * { pointer-events: auto; }
+
+  /* Title —— drawCenteredString(width/2, 17) */
+  .rls-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 17px;
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #ffffff;
+    text-shadow: 1px 1px 0 #3f3f3f;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  /* Label —— drawString(width/2 - 106, row(3)/row(7), 0xA0A0A0) */
+  .rls-label {
+    position: absolute;
+    left: calc(50% - 106px);
+    font-size: var(--font-size, 10px);
+    line-height: 9px;
+    color: #A0A0A0;
+    text-shadow: 1px 1px 0 #1a1a1a;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .rls-label-name { top: 70px; }   /* row(3) */
+  .rls-label-desc { top: 150px; }  /* row(7) */
+
+  /* EditBox 212×20 */
+  .rls-input-wrap {
+    position: absolute;
+    left: calc(50% - 106px);
+    width: 212px;
+    height: 20px;
+  }
+  #rls-name-wrap { top: 90px; }   /* row(4) */
+  #rls-desc-wrap { top: 170px; }  /* row(8) */
+
+  .rls-input-wrap .mc-input {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    font-size: var(--font-size, 10px);
+  }
+
+  /* Open/Close 按钮：row(0) = 10, x = width/2 - 53, 106×20 */
+  .rls-btn-openclose {
+    position: absolute;
+    top: 10px;
+    left: calc(50% - 53px);
+  }
+
+  /* Done / Cancel：row(12) = 250 */
+  .rls-btn-done {
+    position: absolute;
+    top: 250px;
+    left: calc(50% - 108px);
+  }
+  .rls-btn-cancel {
+    position: absolute;
+    top: 250px;
+    left: calc(50% + 2px);
+  }
+</style>
+
+<script src="js/exit.js"></script>
+</head>
+<body>
+
+<audio id="sfx-click" src="assets/sound/click.ogg" preload="auto"></audio>
+
+<canvas id="pano-canvas"></canvas>
+<div id="pano-css"></div>
+<div id="pano-cover"></div>
+
+<div class="rls-root" id="rls-root">
+
+  <div class="rls-title" id="rls-title">Realm Settings</div>
+
+  <button class="mcbtn mcbtn-106 rls-btn-openclose" id="btn-openclose" type="button"></button>
+
+  <div class="rls-label rls-label-name" id="rls-label-name">Name</div>
+  <div class="rls-input-wrap" id="rls-name-wrap">
+    <input class="mc-input" id="rls-name" type="text" autocomplete="off" maxlength="32">
+  </div>
+
+  <div class="rls-label rls-label-desc" id="rls-label-desc">Description</div>
+  <div class="rls-input-wrap" id="rls-desc-wrap">
+    <input class="mc-input" id="rls-desc" type="text" autocomplete="off" maxlength="32">
+  </div>
+
+  <button class="mcbtn mcbtn-106 rls-btn-done"   id="btn-done"   type="button">Done</button>
+  <button class="mcbtn mcbtn-106 rls-btn-cancel" id="btn-cancel" type="button">Cancel</button>
+
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/show_background.js"></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ==========================================================
+     参数
+     ========================================================== */
+  var params   = new URLSearchParams(location.search);
+  var serverId = params.get('id') || '';
+
+  if (!serverId) {
+    try { serverId = localStorage.getItem('mc_realms_server_id') || ''; }
+    catch (e) {}
+  }
+  if (serverId) {
+    try { localStorage.setItem('mc_realms_server_id', serverId); }
+    catch (e) {}
+  }
+
+  /* ==========================================================
+     文案
+     ========================================================== */
+  var TXT = {
+    title:      'Realm Settings',
+    nameLabel:  'Name',
+    descLabel:  'Description',
+    done:       'Done',
+    cancel:     'Cancel',
+    open:       'Open',
+    close:      'Close',
+    closeLine1: 'If you close this world, all players will be disconnected.',
+    closeLine2: 'You can reopen it any time.'
+  };
+
+  /* ==========================================================
+     序列化 / 反序列化（与 realms.html 一致）
+     ========================================================== */
+  var STORAGE_KEY = 'mc_realms';
+  var FN_KEY = '__fn__';
+
+  function serialize(obj) {
+    if (Array.isArray(obj)) return obj.map(serialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      if (k.charAt(0) === '_') continue;
+      var v = obj[k];
+      if (typeof v === 'function') {
+        out[k] = {}; out[k][FN_KEY] = v.toString();
+      } else if (v && typeof v === 'object') {
+        out[k] = serialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function deserialize(obj) {
+    if (Array.isArray(obj)) return obj.map(deserialize);
+    if (!obj || typeof obj !== 'object') return obj;
+    var out = {};
+    for (var k in obj) {
+      var v = obj[k];
+      if (v && typeof v === 'object' && typeof v[FN_KEY] === 'string') {
+        try { out[k] = new Function('return (' + v[FN_KEY] + ')')(); }
+        catch (e) {}
+      } else if (v && typeof v === 'object') {
+        out[k] = deserialize(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return deserialize(JSON.parse(raw));
+    } catch (e) { return null; }
+  }
+
+  function saveData(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize(data))); } catch (e) {}
+  }
+
+  /* ==========================================================
+     数据
+     ========================================================== */
+  var DATA = loadData();
+  if (!DATA || !Array.isArray(DATA.servers)) {
+    location.href = 'realms.html';
+    return;
+  }
+
+  var server = null;
+  for (var i = 0; i < DATA.servers.length; i++) {
+    if (DATA.servers[i].id === serverId) { server = DATA.servers[i]; break; }
+  }
+  if (!server) {
+    location.href = 'realms.html';
+    return;
+  }
+
+  /* ==========================================================
+     DOM
+     ========================================================== */
+  var titleEl     = document.getElementById('rls-title');
+  var labelNameEl = document.getElementById('rls-label-name');
+  var labelDescEl = document.getElementById('rls-label-desc');
+  var nameInput   = document.getElementById('rls-name');
+  var descInput   = document.getElementById('rls-desc');
+  var btnOpenCl   = document.getElementById('btn-openclose');
+  var btnDone     = document.getElementById('btn-done');
+  var btnCancel   = document.getElementById('btn-cancel');
+
+  titleEl.textContent     = TXT.title;
+  labelNameEl.textContent = TXT.nameLabel;
+  labelDescEl.textContent = TXT.descLabel;
+  btnDone.textContent     = TXT.done;
+  btnCancel.textContent   = TXT.cancel;
+
+  nameInput.value = server.name || '';
+  descInput.value = server.description || '';
+
+  /* ==========================================================
+     Done 按钮状态：name 非空
+     ========================================================== */
+  function validName() {
+    return nameInput.value != null && nameInput.value.trim().length > 0;
+  }
+  function refreshDone() {
+    btnDone.disabled = !validName();
+  }
+  nameInput.addEventListener('input', refreshDone);
+  descInput.addEventListener('input', refreshDone);
+
+  /* ==========================================================
+     Open/Close 按钮文案
+     ========================================================== */
+  function refreshOpenClose() {
+    var isOpen = server.state === 'open';
+    btnOpenCl.textContent = isOpen ? TXT.close : TXT.open;
+  }
+
+  /* ==========================================================
+     保存
+     ========================================================== */
+  function saveSettings() {
+    if (!validName()) return;
+    server.name        = nameInput.value.trim();
+    server.description = descInput.value.trim();
+    saveData(DATA);
+  }
+
+  /* ==========================================================
+     Done —— 保存 + back 回 configure_world
+     ========================================================== */
+  btnDone.addEventListener('click', function() {
+    if (btnDone.disabled) return;
+    saveSettings();
+
+    var url = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;   /* 兜底 */
+    }
+  });
+
+  /* ==========================================================
+     Cancel —— 不保存，back 回 configure_world
+     ========================================================== */
+  btnCancel.addEventListener('click', function() {
+    var url = 'realms_configure_world.html?id=' + encodeURIComponent(serverId);
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back(url);
+    } else {
+      location.href = url;   /* 兜底 */
+    }
+  });
+
+  /* ==========================================================
+     Open/Close
+     - OPEN  → 弹 long_confirm（id=5），返回后由 handleLongConfirmResult 处理
+     - CLOSED → 直接打开
+     ========================================================== */
+  btnOpenCl.addEventListener('click', function() {
+    if (server.state === 'open') {
+      /* 弹确认框 */
+      try {
+        localStorage.setItem('mc_realms_long_confirm', JSON.stringify({
+          type:  'info',
+          line2: TXT.closeLine1,
+          line3: TXT.closeLine2,
+          mode:  'yesno',
+          id:    5,
+          back:  'realms_settings.html?id=' + encodeURIComponent(serverId)
+        }));
+      } catch (e) {}
+
+      var url = 'realms_long_confirm.html';
+      if (window.mcBack && typeof window.mcBack.jumpNoPush === 'function') {
+        window.mcBack.jumpNoPush(url);
+      } else {
+        location.href = url;   /* 兜底 */
+      }
+    } else {
+      /* 直接打开 */
+      server.state = 'open';
+      saveData(DATA);
+      refreshOpenClose();
+    }
+  });
+
+  /* ==========================================================
+     处理从 long_confirm 返回的结果
+     id=5 → 关闭世界
+     ========================================================== */
+  (function handleLongConfirmResult() {
+    var raw = null;
+    try {
+      raw = localStorage.getItem('mc_realms_long_confirm_result');
+      if (raw) localStorage.removeItem('mc_realms_long_confirm_result');
+    } catch (e) { return; }
+    if (!raw) return;
+
+    var res;
+    try { res = JSON.parse(raw); } catch (e) { return; }
+    if (!res || res.id !== 5) return;
+
+    if (res.result === true) {
+      server.state = 'closed';
+      saveData(DATA);
+      refreshOpenClose();
+    }
+  })();
+
+  /* ==========================================================
+     键盘
+     - Tab   → 在 name / desc 之间切换
+     - Enter → Done
+     - Esc   → Cancel
+     ========================================================== */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (document.activeElement === nameInput) descInput.focus();
+      else                                      nameInput.focus();
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!btnDone.disabled) btnDone.click();
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      btnCancel.click();
+    }
+  }, true);
+
+  /* ==========================================================
+     启动
+     ========================================================== */
+  refreshDone();
+  refreshOpenClose();
+  try { nameInput.focus(); } catch (e) {}
+
+})();
+</script>
+
+</body>
+</html>
