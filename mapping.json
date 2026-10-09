@@ -1,0 +1,136 @@
+[
+  { "from": "index", "path": "minecraft/textures/gui/title/background/panorama_0.png", "to": "background/panorama_0.png" },
+  { "from": "index", "path": "minecraft/textures/gui/title/background/panorama_1.png", "to": "background/panorama_1.png" },
+  { "from": "index", "path": "minecraft/textures/gui/title/background/panorama_2.png", "to": "background/panorama_2.png" },
+  { "from": "index", "path": "minecraft/textures/gui/title/background/panorama_3.png", "to": "background/panorama_3.png" },
+  { "from": "index", "path": "minecraft/textures/gui/title/background/panorama_4.png", "to": "background/panorama_4.png" },
+  { "from": "index", "path": "minecraft/textures/gui/title/background/panorama_5.png", "to": "background/panorama_5.png" },
+
+  { "from": "jar", "path": "assets/minecraft/textures/gui/title/background/panorama_overlay.png", "to": "background/panorama_overlay.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/menu_background.png", "to": "background/menu_background.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/menu_list_background.png", "to": "background/menu_list_background.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/presets/isles.png", "to": "background/isles.png" },
+
+ { "from": "jar", "path": "assets/minecraft/textures/colormap/", "to": "colormap/" },
+{ "from": "jar", "path": "assets/minecraft/textures/item/",  "to": "item/" },
+{ "from": "jar", "path": "assets/minecraft/textures/block/", "to": "block/" },
+{ "from": "jar", "path": "assets/minecraft/models/",         "to": "models/" },
+{ "from": "jar", "path": "assets/minecraft/blockstates/",    "to": "blockstates/" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/text_field.png", "to": "text_field/text_field.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/text_field_highlighted.png", "to": "text_field/text_field_highlighted.png" },
+
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/slider.png", "to": "slider/slider.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/slider_highlighted.png", "to": "slider/slider_highlighted.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/slider_handle.png", "to": "slider/slider_handle.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/slider_handle_highlighted.png", "to": "slider/slider_handle_highlighted.png" },
+
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/tab.png", "to": "tab/tab.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/tab_highlighted.png", "to": "tab/tab_highlighted.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/tab_selected.png", "to": "tab/tab_selected.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/tab_selected_highlighted.png", "to": "tab/tab_selected_highlighted.png" },
+
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/button.png", "to": "button/button.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/button_highlighted.png", "to": "button/button_highlighted.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/button_disabled.png", "to": "button/button_disabled.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/checkbox.png", "to": "button/checkbox.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/checkbox_highlighted.png", "to": "button/checkbox_highlighted.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/checkbox_selected.png", "to": "button/checkbox_selected.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/checkbox_selected_highlighted.png", "to": "button/checkbox_selected_highlighted.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/locked_button.png", "to": "button/locked_button.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/locked_button_disabled.png", "to": "button/locked_button_disabled.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/locked_button_highlighted.png", "to": "button/locked_button_highlighted.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/unlocked_button.png", "to": "button/unlocked_button.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/unlocked_button_disabled.png", "to": "button/unlocked_button_disabled.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/unlocked_button_highlighted.png", "to": "button/unlocked_button_highlighted.png" },
+
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/realm_status/", "to": "realm_status/" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/icon/accessibility.png", "to": "icon/accessibility.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/icon/language.png",      "to": "icon/language.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/icon/new_realm.png",     "to": "icon/new_realm.png" },
+
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/friends.png",                     "to": "icon/friends.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/misc/unknown_pack.png", "to": "icon/unknown_pack.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/accept.png",              "to": "friends/accept.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/accept_highlighted.png", "to": "friends/accept_highlighted.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/background.png",         "to": "friends/background.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/background_dark.png",    "to": "friends/background_dark.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/button.png",             "to": "friends/button.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/button_disabled.png",    "to": "friends/button_disabled.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/button_highlighted.png", "to": "friends/button_highlighted.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/cancel.png",             "to": "friends/cancel.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/friends.png",            "to": "friends/friends.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/illustrations_00.png",   "to": "friends/illustrations_00.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/list_separator_top.png", "to": "friends/list_separator_top.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/loading.png",            "to": "friends/loading.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/reject.png",             "to": "friends/reject.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/reject_highlighted.png", "to": "friends/reject_highlighted.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/remove.png",             "to": "friends/remove.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/send_request.png",       "to": "friends/send_request.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/friends/toast_background.png",   "to": "friends/toast_background.png" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/server_list/", "to": "server_list/" },
+  { "from": "jar", "path": "assets/minecraft/textures/gui/sprites/transferable_list/", "to": "transferable_list/" },
+
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/container/slot.png", "to": "gui/slot.png" },
+
+  { "from": "jar",   "path": "assets/minecraft/textures/gui/realms/", "to": "realms/" },
+{ "from": "realm", "path": "assets/realms/textures/gui/title/realms.png", "to": "realms/realms.png" },
+{
+  "script": "zf = zipfile.ZipFile(realm_path)\nprefix = 'assets/realms/textures/gui/realms/'\nBLACKLIST = {'no_realms.png', 'snapshot_realms.png'}\ndst = out_root / 'realms'\ndst.mkdir(parents=True, exist_ok=True)\nn = 0\nfor name in zf.namelist():\n    if name.endswith('/') or not name.startswith(prefix):\n        continue\n    rel = name[len(prefix):]\n    if '/' in rel or rel in BLACKLIST:\n        continue\n    out = dst / rel\n    with zf.open(name) as s, open(out, 'wb') as d:\n        shutil.copyfileobj(s, d)\n    n += 1\nlog('realm icons: ' + str(n), 'OK')"
+},
+{ "from": "realm", "path": "assets/realms/textures/gui/realms/news_notification_mainscreen.png", "to": "icon/news_notification_mainscreen.png" },
+{
+  "script": "import subprocess\nsrc_dir = out_root / 'realms'\ndst = out_root / 'icon'\ndst.mkdir(parents=True, exist_ok=True)\n\ntrial = src_dir / 'trial_icon.png'\nsubprocess.run(['magick', str(trial), '-crop', '8x8+0+0', '+repage', str(dst / 'realms_trial_b.png')], check=True)\nsubprocess.run(['magick', str(trial), '-crop', '8x8+0+8', '+repage', str(dst / 'realms_trial_a.png')], check=True)\n(dst / 'realms_trial_a.png').rename(dst / 'realms_trial_on.png')\n(dst / 'realms_trial_b.png').rename(dst / 'realms_trial_off.png')\n\ninv = src_dir / 'invite_icon.png'\nsubprocess.run(['magick', str(inv), '-crop', '15x25+0+0',  '+repage', str(dst / 'realms_invite_on.png')],  check=True)\nsubprocess.run(['magick', str(inv), '-crop', '16x25+15+0', '+repage', str(dst / 'realms_invite_off.png')], check=True)\n\nlog('icon slice done', 'OK')"
+},
+  { "from": "realm", "path": "assets/realms/textures/gui/realms/images/", "to": "realm_images/" },
+
+  { "from": "jar", "path": "assets/minecraft/texts/splashes.txt", "to": "texts/splashes.txt" },
+{ "from": "index", "path": "minecraft/sounds/random/click.ogg", "to": "sound/click.ogg" },
+  { "from": "jar", "path": "data/minecraft/worldgen/biome/", "to": "biome/" },
+  { "from": "jar", "path": "data/minecraft/worldgen/flat_level_generator_preset/", "to": "world_presets/flat/" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/world_list/", "to": "icon/world_selection/" },
+{ "from": "jar", "path": "assets/minecraft/textures/misc/unknown_server.png", "to": "icon/world_selection/unknown_server.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/scroller.png",            "to": "slider/scroller.png" },
+{ "from": "jar", "path": "assets/minecraft/textures/gui/sprites/widget/scroller_background.png", "to": "slider/scroller_background.png" },
+  { "from": "jar", "path": "pack.png", "to": "resourcepacks/vanilla-pack.png" },
+
+  {
+    "script": "zs = None\nh = index.get('minecraft/resourcepacks/high_contrast.zip')\nif h:\n    p = assets_root / 'objects' / h[:2] / h\n    if p.exists(): zs = p\nif zs is None:\n    p = assets_root / 'minecraft' / 'resourcepacks' / 'high_contrast.zip'\n    if p.exists(): zs = p\nif zs is None:\n    log('high_contrast.zip 未找到', 'WARN')\nelse:\n    (out_root / 'resourcepacks').mkdir(parents=True, exist_ok=True)\n    with zipfile.ZipFile(zs) as z:\n        with z.open('pack.png') as s, open(out_root / 'resourcepacks' / 'high_contrast-pack.png', 'wb') as d:\n            shutil.copyfileobj(s, d)\n    log('high_contrast pack.png', 'OK')"
+  },
+
+
+
+{
+  "script": "import subprocess\nsh_src = out_root.parent / 'preset_assets' / 'data.sh'\nbg = out_root / 'background'\nbg.mkdir(parents=True, exist_ok=True)\nif not sh_src.exists():\n    log('preset_assets/data.sh 缺失', 'ERR')\nelse:\n    shutil.copy(sh_src, bg / 'data.sh')\n    r = subprocess.run(['bash', 'data.sh'], cwd=str(bg), capture_output=True, text=True)\n    if r.returncode != 0:\n        log('data.sh 失败: ' + r.stderr, 'ERR')\n    else:\n        log('panorama_equirect.png 已生成', 'OK')"
+},
+  {
+    "script": "import subprocess, sys\npy = out_root.parent / 'gen_biome_index.py'\nr = subprocess.run([sys.executable, str(py)], capture_output=True, text=True)\nif r.returncode != 0:\n    log('gen_biome_index.py 失败: ' + r.stderr, 'ERR')\nelse:\n    log(r.stdout.strip(), 'OK')"
+  },
+
+  {
+    "script": "import subprocess, sys\npy = out_root.parent / 'gen_world_preset_index.py'\nr = subprocess.run([sys.executable, str(py)], capture_output=True, text=True)\nif r.returncode != 0:\n    log('gen_world_preset_index.py 失败: ' + r.stderr, 'ERR')\nelse:\n    log(r.stdout.strip(), 'OK')"
+  },
+
+  {
+    "script": "import subprocess, sys\npy = out_root.parent / 'lang.py'\nr = subprocess.run([\n    sys.executable, str(py),\n    '--jar', str(jar_path),\n    '--assets', str(assets_root),\n    '--out', str(out_root / 'lang'),\n    '--i18n', ''\n], capture_output=True, text=True)\nif r.returncode != 0:\n    log('lang.py 失败: ' + r.stderr, 'ERR')\nelse:\n    log('lang 提取完成', 'OK')"
+  },
+
+  { "from": "preset", "path": "minecraft.ttf",         "to": "font/minecraft.ttf" },
+  { "from": "preset", "path": "vanilla.js",            "to": "resourcepacks/vanilla.js" },
+  { "from": "preset", "path": "high_contrast.js",      "to": "resourcepacks/high_contrast.js" },
+  { "from": "preset", "path": "index.js",              "to": "resourcepacks/index.js" },
+  { "from": "preset", "path": "presets.js",            "to": "servers/presets.js" },
+  {
+  "script": "# 清理多余文件\n# realms 里不该存在的残留\nextra = [\n    out_root / 'realms' / 'no_realms.png',\n    out_root / 'realms' / 'snapshot_realms.png',\n]\nfor p in extra:\n    if p.exists():\n        p.unlink()\n        log('删除残留: ' + str(p.relative_to(out_root)), 'OK')\n\n# friends 里如果有历史遗留的 .mcmeta，也清掉\nfd = out_root / 'friends'\nif fd.is_dir():\n    for f in fd.iterdir():\n        if f.is_file() and f.name.endswith('.mcmeta'):\n            f.unlink()\n            log('删除残留: ' + str(f.relative_to(out_root)), 'OK')\nlog('清理完成', 'OK')"
+},
+{
+  "script": "import subprocess\nwith zipfile.ZipFile(jar_path) as z:\n    for name, size in [('minecraft', '256x64'), ('minceraft', '256x64'), ('edition', '128x16')]:\n        inner = 'assets/minecraft/textures/gui/title/' + name + '.png'\n        try:\n            with z.open(inner) as s:\n                data = s.read()\n        except KeyError:\n            log('logo 缺失: ' + inner, 'WARN')\n            continue\n        tmp = out_root / 'logo' / (name + '.png')\n        tmp.parent.mkdir(parents=True, exist_ok=True)\n        tmp.write_bytes(data)\n        dst = out_root / 'logo' / (name + '_small.png')\n        subprocess.run(['magick', str(tmp), '-resize', size + '!', str(dst)], check=True)\n        tmp.unlink()\n        log('logo ' + name + '_small.png', 'OK')"
+},
+
+  {
+    "script": "import subprocess\nsizes = [20, 44, 70, 71, 80, 83, 85, 90, 95, 97, 98, 100, 106, 120, 150, 153, 160, 170, 205, 210, 310]\nmc = out_root.parent / 'mcslice.sh'\nfor w in sizes:\n    for base in ['button', 'button_highlighted', 'button_disabled']:\n        src = out_root / 'button' / (base + '.png')\n        dst = out_root / 'button' / (base + '_' + str(w) + '.png')\n        subprocess.run(['bash', str(mc), str(src), str(dst), str(w), '20', '3'], check=True)\nlog('button slices done', 'OK')"
+  },
+
+  {
+    "script": "import subprocess\nfor base in ['slider', 'slider_highlighted']:\n    src = out_root / 'slider' / (base + '.png')\n    for w in [170, 310]:\n        dst = out_root / 'slider' / (base + '_' + str(w) + '.png')\n        subprocess.run(['magick', 'convert', str(src), '-resize', str(w) + 'x20!', str(dst)], check=True)\nlog('slider variants done', 'OK')"
+  }
+]
