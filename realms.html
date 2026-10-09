@@ -954,16 +954,29 @@ lv.addEventListener('click', function(e) {
       popupBtnsEl.innerHTML = '';
       var trialsAvailable = DATA.trialAvailable && !DATA.createdTrial;
 
+// 找到 renderPopup() 里 trialsAvailable 分支之后
+// 现有代码大概是这样：
 if (trialsAvailable) {
   var btnTry = document.createElement('a');
-  btnTry.className = 'mcbtn mcbtn-half';        /* 默认 <a>，无特殊 class */
+  btnTry.className = 'mcbtn mcbtn-half';
   btnTry.href = 'realms_create_trial.html';
   btnTry.textContent = TXT.trial;
   popupBtnsEl.appendChild(btnTry);
   popupBtnsEl.style.top = '107px';
 } else {
+// 在它之后，加"Create a new Realm"按钮：
+var btnCreate = document.createElement('a');
+btnCreate.className = 'mcbtn mcbtn-half';
+btnCreate.href = 'realms_create_realm.html';
+btnCreate.textContent = 'Create a new Realm';
+popupBtnsEl.appendChild(btnCreate);
+
+// 调整 btns 容器 top，让三个按钮都放得下
+
   popupBtnsEl.style.top = '117px';
 }
+
+
 
 var btnBuy = document.createElement('button');
 btnBuy.className = 'mcbtn mcbtn-half';
@@ -1227,6 +1240,8 @@ newsIconEl.addEventListener('click', function() {
      启动
      ========================================================== */
   loadRealmExpiresMeta();
+  /* 启动时把 localStorage 的状态写回 cookie，供主菜单读取 */
+syncToMainMenu();
   render();
 
   window.addEventListener('resize', function() { layoutTopIcons(); });

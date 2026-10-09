@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Create a realm</title>
+<title>Create a new Realm</title>
 
 <link rel="preload" as="image" href="assets/background/panorama_equirect.png">
 <link rel="preload" as="image" href="assets/background/panorama_0.png">
@@ -19,11 +19,7 @@
 <script src="js/font.js"></script>
 
 <style>
-  html, body {
-    margin: 0; padding: 0;
-    width: 100%; height: 100%;
-    overflow: hidden;
-  }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
   body {
     color: #fff;
     font-family: 'Minecraft', monospace;
@@ -32,7 +28,9 @@
     position: relative;
   }
 
-  .trial-root {
+  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+
+  .crr-root {
     position: fixed;
     top: 0; left: 50%;
     transform: translateX(-50%) scale(var(--ui-scale, 1));
@@ -41,61 +39,62 @@
     height: calc(100vh / var(--ui-scale, 1));
     z-index: 1;
     overflow: hidden;
+    pointer-events: none;
   }
+  .crr-root > * { pointer-events: auto; }
 
-  .trial-title {
+  .crr-title {
     position: absolute;
-    top: 11px;
     left: 0; right: 0;
+    top: 11px;
     text-align: center;
-    font-family: 'Minecraft', monospace;
     font-size: var(--font-size, 10px);
-    line-height: 1;
+    line-height: 9px;
     color: #ffffff;
     text-shadow: 1px 1px 0 #3f3f3f;
     user-select: none;
+    pointer-events: none;
   }
 
-  .trial-label {
+  .crr-label {
     position: absolute;
     left: calc(50% - 100px);
-    font-family: 'Minecraft', monospace;
     font-size: var(--font-size, 10px);
-    line-height: 1;
+    line-height: 9px;
     color: #A0A0A0;
     text-shadow: 1px 1px 0 #1a1a1a;
     user-select: none;
     white-space: nowrap;
+    pointer-events: none;
   }
-  .trial-label.label-name { top: 52px; }
-  .trial-label.label-desc { top: 102px; }
+  .crr-label-name { top: 52px; }
+  .crr-label-desc { top: 102px; }
 
-  .trial-input-wrap {
+  .crr-input-wrap {
     position: absolute;
     left: calc(50% - 100px);
     width: 200px;
     height: 20px;
   }
-  #trial-name-wrap { top: 65px; }
-  #trial-desc-wrap { top: 115px; }
+  #crr-name-wrap { top: 65px; }
+  #crr-desc-wrap { top: 115px; }
 
-  .trial-input-wrap .mc-input {
+  .crr-input-wrap .mc-input {
     width: 100%;
     height: 100%;
     box-sizing: border-box;
-    font-family: 'Minecraft', monospace;
     font-size: var(--font-size, 10px);
   }
 
-  .trial-footer {
+  .crr-btn {
     position: absolute;
-    left: 0; right: 0;
-    display: flex;
-    justify-content: center;
-    gap: 4px;
   }
-
-  #pano-cover { background: rgba(0, 0, 0, 0.35); }
+  .crr-btn-create {
+    left: calc(50% - 100px);
+  }
+  .crr-btn-cancel {
+    left: calc(50% + 5px);
+  }
 </style>
 
 <script src="js/exit.js"></script>
@@ -108,24 +107,22 @@
 <div id="pano-css"></div>
 <div id="pano-cover"></div>
 
-<div class="trial-root">
+<div class="crr-root" id="crr-root">
 
-  <div class="trial-title">Create a realm</div>
+  <div class="crr-title">Create a new Realm</div>
 
-  <div class="trial-label label-name">Realm name</div>
-  <div class="trial-input-wrap" id="trial-name-wrap">
-    <input class="mc-input" id="trial-name" type="text" autocomplete="off">
+  <div class="crr-label crr-label-name">Realm name</div>
+  <div class="crr-input-wrap" id="crr-name-wrap">
+    <input class="mc-input" id="crr-name" type="text" autocomplete="off">
   </div>
 
-  <div class="trial-label label-desc">Realm description</div>
-  <div class="trial-input-wrap" id="trial-desc-wrap">
-    <input class="mc-input" id="trial-desc" type="text" autocomplete="off">
+  <div class="crr-label crr-label-desc">Realm description</div>
+  <div class="crr-input-wrap" id="crr-desc-wrap">
+    <input class="mc-input" id="crr-desc" type="text" autocomplete="off">
   </div>
 
-  <div class="trial-footer" id="trial-footer">
-    <button class="mcbtn mcbtn-half" id="btn-create" disabled>Create</button>
-    <a class="mcbtn mcbtn-half btn-back" id="btn-cancel" href="realms.html">Cancel</a>
-  </div>
+  <button class="mcbtn mcbtn-97 crr-btn crr-btn-create" id="btn-create" type="button" disabled>Create</button>
+  <button class="mcbtn mcbtn-95 crr-btn crr-btn-cancel" id="btn-cancel" type="button">Cancel</button>
 
 </div>
 
@@ -143,13 +140,15 @@
      文案（Realms 无 i18n）
      ========================================================== */
   var TXT = {
-    create:    'Create',
-    cancel:    'Cancel',
-    emptyName: 'You must enter a name!'
+    title:   'Create a new Realm',
+    nameLbl: 'Realm name',
+    descLbl: 'Realm description',
+    create:  'Create',
+    cancel:  'Cancel'
   };
 
   /* ==========================================================
-     Cookie 工具 —— 供主菜单 show_realm.js 读取
+     Cookie 工具
      ========================================================== */
   function getCookie(name) {
     var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
@@ -216,7 +215,7 @@
   }
 
   /* ==========================================================
-     同步 cookie 到主菜单 —— 逻辑与 realms.html 的 syncToMainMenu 一致
+     同步 cookie 到主菜单
      ========================================================== */
   function syncCookiesToMainMenu(data) {
     if (data.pendingInvites > 0) {
@@ -247,11 +246,11 @@
   /* ==========================================================
      DOM
      ========================================================== */
-  var nameInput = document.getElementById('trial-name');
-  var descInput = document.getElementById('trial-desc');
+  var rootEl    = document.getElementById('crr-root');
+  var nameInput = document.getElementById('crr-name');
+  var descInput = document.getElementById('crr-desc');
   var btnCreate = document.getElementById('btn-create');
-  var footerEl  = document.getElementById('trial-footer');
-  var rootEl    = document.querySelector('.trial-root');
+  var btnCancel = document.getElementById('btn-cancel');
 
   /* ==========================================================
      校验
@@ -266,12 +265,13 @@
   descInput.addEventListener('input', refreshCreateState);
 
   /* ==========================================================
-     定位 Footer —— y = height/4 + 120 + 17
+     布局：按钮 y = height/4 + 120 + 17
      ========================================================== */
   function layoutFooter() {
     var h = rootEl.clientHeight || window.innerHeight;
     var y = Math.floor(h / 4) + 120 + 17;
-    footerEl.style.top = y + 'px';
+    btnCreate.style.top = y + 'px';
+    btnCancel.style.top = y + 'px';
   }
   layoutFooter();
   window.addEventListener('resize', layoutFooter);
@@ -306,7 +306,7 @@
       ownerUUID:   data.ownUUID || 'self-uuid',
       state:       'closed',
       expired:     false,
-      daysLeft:    0,
+      daysLeft:    30,
       players:     { online: 0, max: 10 },
       activeSlot:  1,
       slots: {
@@ -317,12 +317,12 @@
     };
 
     data.servers.push(newServer);
-    data.createdTrial = true;
 
     saveData(data);
     syncCookiesToMainMenu(data);
 
-    /* 回主列表 */
+    try { localStorage.setItem('mc_realms_server_id', newServer.id); } catch (e) {}
+
     if (window.mcBack && typeof window.mcBack.back === 'function') {
       window.mcBack.back('realms.html');
     } else {
@@ -331,8 +331,22 @@
   }
 
   btnCreate.addEventListener('click', function() {
+    if (btnCreate.disabled) return;
     createRealm();
   });
+
+  /* ==========================================================
+     取消 / Esc
+     ========================================================== */
+  function goBack() {
+    if (window.mcBack && typeof window.mcBack.back === 'function') {
+      window.mcBack.back('realms.html');
+    } else {
+      location.replace('realms.html');
+    }
+  }
+
+  btnCancel.addEventListener('click', goBack);
 
   /* ==========================================================
      键盘
@@ -346,11 +360,14 @@
 
     if (e.key === 'Escape') {
       e.preventDefault();
-      if (window.mcBack && typeof window.mcBack.back === 'function') {
-        window.mcBack.back('realms.html');
-      } else {
-        location.replace('realms.html');
-      }
+      goBack();
+      return;
+    }
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (document.activeElement === nameInput) descInput.focus();
+      else nameInput.focus();
     }
   }, true);
 
@@ -358,7 +375,7 @@
      启动
      ========================================================== */
   refreshCreateState();
-  nameInput.focus();
+  try { nameInput.focus(); } catch (e) {}
 
 })();
 </script>

@@ -487,3 +487,16 @@
 .mcbtn-85:disabled {
   background-image: url('../assets/button/button_disabled_85.png');
 }
+/* 95×20 —— Create Realm 的 Cancel */
+.mcbtn-95 {
+  width: 95px;
+  height: 20px;
+  background-image: url('../assets/button/button_95.png');
+}
+.mcbtn-95:hover:not(:disabled),
+.mcbtn-95:focus:not(:disabled) {
+  background-image: url('../assets/button/button_highlighted_95.png');
+}
+.mcbtn-95:disabled {
+  background-image: url('../assets/button/button_disabled_95.png');
+}
